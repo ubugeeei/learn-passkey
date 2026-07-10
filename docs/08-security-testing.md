@@ -4,7 +4,7 @@
 
 Success-path tests prove that one valid transcript works. Authentication confidence comes from showing that each altered binding fails for the right reason and that failure does not leave reusable state.
 
-The current suite has 52 tests in 11 suites:
+The current suite has 54 tests in 11 suites:
 
 ```sh
 just test

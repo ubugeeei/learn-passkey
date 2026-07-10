@@ -85,7 +85,7 @@ public actor SQLitePasskeyRepository: PasskeyRepository {
 
   public func create(user: UserAccount, credential: CredentialRecord) throws {
     guard user.id == credential.userID, user.userHandle == credential.userHandle else {
-      throw SQLitePersistenceError.corrupted("Credential account binding is inconsistent")
+      throw PasskeyRepositoryError.inconsistentAccountBinding
     }
 
     try database.transaction {

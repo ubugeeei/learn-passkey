@@ -83,6 +83,41 @@ import Testing
     }
   }
 
+  @Test func repositoryRejectsInconsistentAccountBindingWithoutPartialWrite() async throws {
+    let repository = InMemoryPasskeyRepository()
+    let user = UserAccount(
+      id: UUID(),
+      userHandle: Data(repeating: 0x01, count: 32),
+      username: "alice@example.com",
+      displayName: "Alice",
+      createdAt: now
+    )
+    let otherUserID = UUID()
+    let credential = try CredentialRecord(
+      id: Data(repeating: 0x02, count: 32),
+      userID: otherUserID,
+      userHandle: user.userHandle,
+      publicKey: COSEEC2PublicKey(
+        algorithm: -7,
+        curve: 1,
+        x: Data(repeating: 0x03, count: 32),
+        y: Data(repeating: 0x04, count: 32)
+      ),
+      rawPublicKey: Data(),
+      aaguid: Data(repeating: 0, count: 16),
+      signCount: 0,
+      backupEligible: false,
+      backupState: false,
+      createdAt: now
+    )
+
+    await #expect(throws: PasskeyRepositoryError.inconsistentAccountBinding) {
+      try await repository.create(user: user, credential: credential)
+    }
+    #expect(await repository.user(id: user.id) == nil)
+    #expect(await repository.credential(id: credential.id) == nil)
+  }
+
   private func makeService(
     repository: InMemoryPasskeyRepository = InMemoryPasskeyRepository(),
     ceremonies: InMemoryCeremonyStore = InMemoryCeremonyStore()

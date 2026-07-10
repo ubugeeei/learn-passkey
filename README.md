@@ -51,7 +51,7 @@ The server starts on `http://127.0.0.1:8080`. A native Passkey ceremony requires
 | `Tests` | Unit, integration, attack, transport, and synthetic-authenticator tests |
 | `docs` | The complete hands-on course, architecture, threat model, and reference material |
 
-The current suite contains 52 tests across protocol primitives, ceremonies, persistence, sessions, HTTP boundaries, and the client transport. Run `just test` whenever a chapter asks you to change an invariant.
+The current suite contains 54 tests across protocol primitives, ceremonies, persistence, sessions, HTTP boundaries, and the client transport. Run `just test` whenever a chapter asks you to change an invariant.
 
 ## Important scope boundary
 

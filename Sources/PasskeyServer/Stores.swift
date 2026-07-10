@@ -67,6 +67,7 @@ public enum PasskeyRepositoryError: Error, Equatable, Sendable {
   case usernameAlreadyExists
   case credentialAlreadyExists
   case credentialNotFound
+  case inconsistentAccountBinding
 }
 
 /// Process-local account and credential storage used by the lab.
@@ -105,8 +106,9 @@ public actor InMemoryPasskeyRepository: PasskeyRepository {
     guard credentialsByID[credential.id] == nil else {
       throw PasskeyRepositoryError.credentialAlreadyExists
     }
-    precondition(user.id == credential.userID)
-    precondition(user.userHandle == credential.userHandle)
+    guard user.id == credential.userID, user.userHandle == credential.userHandle else {
+      throw PasskeyRepositoryError.inconsistentAccountBinding
+    }
 
     usersByID[user.id] = user
     userIDsByUsername[user.username] = user.id
