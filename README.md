@@ -1,52 +1,79 @@
-# Learn Passkey with Swift
+# Learn Passkeys by Implementing Them in Swift
 
-Passkey を「API の呼び出し方」ではなく、WebAuthn の仕様、バイト列、暗号検証、状態管理、iOS の UX、運用上の防御まで、Swift で段階的に実装して理解するハンズオンです。
+This repository is a from-zero, implementation-first course on Passkeys and WebAuthn. The client and server are both written in Swift. You will inspect the protocol bytes, implement the relying-party checks, drive Apple's AuthenticationServices API, and finish with the operational decisions needed for a real service.
 
-クライアントとサーバーをどちらも Swift で実装します。サーバーの HTTP 転送層に SwiftNIO、Linux での暗号実装互換性に Swift Crypto を使いますが、WebAuthn の検証ロジック、CBOR/COSE の解釈、challenge と credential の管理はこのリポジトリ内で実装します。
+The course intentionally uses very few libraries:
 
-## 到達点
+- **SwiftNIO** only for HTTP transport.
+- **Swift Crypto** for portable SHA-256 and P-256 operations.
+- **Swift Testing** for the test harness when full Xcode is not installed.
+- Base64url, CBOR/COSE parsing, authenticator-data parsing, ceremony state, verification order, credential storage ports, and session policy are implemented in this repository.
 
-最後まで進むと、次を説明・実装・レビューできる状態を目指します。
+## What you will be able to do
 
-- パスワード、公開鍵認証、WebAuthn、Passkey の関係を説明する
-- registration と authentication の各バイト列を仕様と対応づける
-- RP ID、origin、challenge、UP/UV、credential ID、user handle の役割を説明する
-- `clientDataJSON`、attestation object、authenticator data、COSE key を自力で解析する
-- ES256 assertion signature をサーバーで検証する
-- challenge の一回性、期限、credential counter、session を安全に管理する
-- AuthenticationServices を使う iOS クライアントを実装する
-- Associated Domains と AASA を正しく構成する
-- account recovery、credential 管理、監査、レート制限を含む本番設計を判断する
+After completing the course, you should be able to:
 
-## 進め方
+- explain the relationship between public-key cryptography, WebAuthn, and Passkeys;
+- trace registration and authentication byte-for-byte;
+- explain RP ID, origin, challenge, credential ID, user handle, UP, UV, BE, BS, and `signCount`;
+- decode `clientDataJSON`, attestation objects, authenticator data, and COSE keys;
+- verify an ES256 assertion without hiding the logic behind a WebAuthn library;
+- integrate an iOS app using AuthenticationServices and Associated Domains;
+- design single-use challenges, credential lifecycle, application sessions, recovery, rate limits, audit events, and production persistence;
+- review a Passkey implementation against the W3C relying-party algorithms and a concrete threat model.
 
-1. [学習ロードマップ](docs/00-roadmap.md)で全体像と完了条件を確認する
-2. [最初のメンタルモデル](docs/01-mental-model.md)を読む
-3. `nix develop` で同じ開発環境に入る
-4. 各章でコードを読み、テストを壊し、直し、実際の iOS 端末で ceremony を通す
-5. 最後に threat model と production checklist を使って自分の設計をレビューする
+## Start here
 
-各章は「目的 → 仕様 → 実装 → 観察 → 演習 → 完了条件」の順で、前から通読できる構成にします。
+1. Read the [course roadmap](docs/00-roadmap.md).
+2. Build the [mental model](docs/01-mental-model.md).
+3. Enter the [Nix development environment](docs/02-environment.md).
+4. Follow the hands-on chapters in numeric order.
+5. Use the [production hardening checklist](docs/09-production-hardening.md) before treating any derivative as production-ready.
 
-## 重要な境界
+```sh
+nix develop
+just test
+just server
+```
 
-この教材は、学習用の短い擬似実装ではなく、検証順序や失敗時の扱いまで実用水準に近づけます。一方で、次は意図的に境界の外に置き、production adapter の差し替え点として明示します。
+The server starts on `http://127.0.0.1:8080`. A native Passkey ceremony requires a real HTTPS RP domain and a matching Associated Domains configuration; the local HTTP listener is designed to sit behind that development TLS endpoint.
 
-- TLS 終端と DDoS 防御
-- 永続 DB、KMS、secret rotation
-- メールや本人確認を伴う account recovery
-- FIDO Metadata Service を使う attestation trust policy
-- 分散環境での challenge/session の共有
+## Repository map
 
-これらを省略したまま「本番対応」とは呼びません。最終章で必要な差し替えと受け入れ基準を定義します。
+| Path | Responsibility |
+| --- | --- |
+| `Sources/PasskeyCore` | Shared API models, strict Base64url, bounded CBOR, COSE, client data, and authenticator data |
+| `Sources/PasskeyServer` | Ceremony orchestration, verifiers, repository ports, in-memory adapters, and hashed sessions |
+| `Sources/PasskeyHTTP` | Safe public error mapping and the bounded SwiftNIO HTTP adapter |
+| `Sources/PasskeyClient` | Typed RP API client and the AuthenticationServices bridge |
+| `Apps/PasskeyLab` | SwiftUI iOS application, entitlement, and local package integration |
+| `Tests` | Unit, integration, attack, transport, and synthetic-authenticator tests |
+| `docs` | The complete hands-on course, architecture, threat model, and reference material |
 
-## 一次資料
+The current suite contains 45 tests across protocol primitives, ceremonies, sessions, HTTP boundaries, and the client transport. Run `just test` whenever a chapter asks you to change an invariant.
 
-- [Web Authentication Level 3](https://www.w3.org/TR/webauthn-3/)
+## Important scope boundary
+
+The code is deliberately strong at the WebAuthn protocol boundary, but the included process-local storage is a teaching adapter. The executable prints that warning at startup. A production deployment must replace or add:
+
+- transactional persistent storage and uniqueness constraints;
+- atomic distributed challenge consumption;
+- TLS termination, trusted-proxy policy, request deadlines, and distributed rate limits;
+- production secret/session storage and incident revocation;
+- account recovery and credential-management product flows;
+- audit/event pipelines, privacy retention, backups, and disaster recovery;
+- an explicit attestation trust policy if attestation other than `none` is requested.
+
+The [production chapter](docs/09-production-hardening.md) defines acceptance criteria for each item. Omitting those items is a known limitation, not an implicit production claim.
+
+## Primary references
+
+- [W3C Web Authentication Level 3](https://www.w3.org/TR/webauthn-3/)
 - [Apple: Supporting passkeys](https://developer.apple.com/documentation/authenticationservices/supporting-passkeys)
 - [Apple: Supporting associated domains](https://developer.apple.com/documentation/xcode/supporting-associated-domains)
+- [RFC 4648: Base-N Encodings](https://www.rfc-editor.org/rfc/rfc4648.html)
 - [RFC 8949: CBOR](https://www.rfc-editor.org/rfc/rfc8949.html)
 - [RFC 9052: COSE Structures](https://www.rfc-editor.org/rfc/rfc9052.html)
 - [RFC 9053: COSE Algorithms](https://www.rfc-editor.org/rfc/rfc9053.html)
 
-仕様と OS API は更新されます。このリポジトリの説明より一次資料を優先してください。
+Specifications and platform APIs evolve. Prefer the primary source when it conflicts with an explanation in this course.

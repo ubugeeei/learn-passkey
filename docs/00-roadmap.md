@@ -1,124 +1,146 @@
-# 学習ロードマップ
+# Course Roadmap
 
-## 学び方の原則
+## How this course works
 
-Passkey は一つの API ではありません。OS、authenticator、クライアント、Relying Party server、Web PKI、アカウント運用が協調する仕組みです。そのため、このハンズオンでは UI から始めず、観測可能なデータと trust boundary を一層ずつ積み上げます。
+A Passkey is not one API call. It is a protocol and product system spanning an authenticator, client platform, application, relying-party server, web origin, account model, and recovery policy. The course therefore builds from observable bytes and trust boundaries rather than beginning with a polished login screen.
 
-各ステップには次の完了条件があります。
+Every phase uses five completion lenses:
 
-- **Explain**: 自分の言葉で「なぜ必要か」を説明できる
-- **Inspect**: 実際のバイト列や状態を観察できる
-- **Implement**: ライブラリの検証関数に隠さず実装できる
-- **Attack**: 何を省略するとどの攻撃が成立するか説明できる
-- **Operate**: 失効、回復、監査、障害時の方針を決められる
+- **Explain** — state why a value or check exists in your own words.
+- **Inspect** — locate that value in real bytes or server state.
+- **Implement** — implement the behavior without delegating the important check to a WebAuthn library.
+- **Attack** — demonstrate what fails when the check is removed or changed.
+- **Operate** — decide how the behavior works across expiry, revocation, failure, and multiple service instances.
 
-## Phase 0: 土台
+## Phase 0 — Foundations
 
-### Step 0 — 認証のメンタルモデル
+### Step 0: Authentication mental model
 
-公開鍵、署名、challenge-response、phishing resistance、RP ID と origin を学びます。
+Learn public/private keys, signatures, challenge-response, phishing resistance, RP ID, origin, authenticator, and application session.
 
-成果物:
+Artifacts:
 
-- 登場主体と trust boundary の図
-- registration/authentication のシーケンス
-- 用語集
+- entity and trust-boundary map;
+- registration and authentication sequences;
+- glossary of identifiers and flags.
 
-### Step 1 — 再現可能な Swift 環境
+### Step 1: Reproducible Swift environment
 
-Nix、SwiftPM、テスト、formatter/linter の入口を揃えます。macOS では Swift toolchain と Apple SDK は Xcode/Command Line Tools を利用し、Nix は周辺ツールと環境変数を固定します。
-
-確認:
+Use Nix for surrounding tools and the selected Apple toolchain for Swift and Apple SDKs.
 
 ```sh
 nix develop
 swift --version
-swift test
+just test
 ```
 
-## Phase 1: wire format を理解する
+## Phase 1 — Understand the wire format
 
-### Step 2 — Base64url と protocol model
+### Step 2: Base64url and protocol models
 
-JSON がバイト列を直接持てないため WebAuthn が使う unpadded Base64url を実装します。challenge、credential ID、user handle を「文字列」ではなく opaque bytes として扱います。
+Implement strict unpadded Base64url. Treat challenges, credential IDs, user handles, public-key coordinates, signatures, and session tokens as opaque bytes rather than ordinary strings.
 
-### Step 3 — CBOR を読む
+### Step 3: Bounded deterministic CBOR
 
-attestation object と COSE key を読むため、必要範囲の CBOR decoder を実装します。length limit、nesting limit、duplicate key rejection もここで扱います。
+Implement the WebAuthn/COSE subset of CBOR with definite lengths, shortest integer encodings, canonical map ordering, duplicate-key rejection, depth limits, and allocation limits.
 
-### Step 4 — authenticator data と COSE key
+### Step 4: Authenticator data and COSE keys
 
-`rpIdHash | flags | signCount | attestedCredentialData | extensions` の境界を byte cursor で読み、ES256/P-256 公開鍵を取り出します。
+Parse:
 
-## Phase 2: Relying Party server
+```text
+rpIdHash | flags | signCount | attestedCredentialData | extensions
+```
 
-### Step 5 — registration options
+Extract an ES256/P-256 public key and understand every flag before applying RP policy.
 
-user handle と challenge を CSPRNG で生成し、期限つき・一回限りの ceremony state に保存します。client へ渡す options と server にだけ残す期待値を分離します。
+## Phase 2 — Build the relying-party server
 
-### Step 6 — registration verification
+### Step 5: Registration options
 
-WebAuthn の検証順序に沿って、type、challenge、origin、RP ID hash、UP/UV、attested credential data、algorithm を検証します。教材の標準 policy は privacy を優先した `attestation: none`、discoverable credential、user verification required です。
+Generate an opaque 32-byte user handle and 32-byte challenge with a CSPRNG. Store the challenge with purpose and expiry. Keep the account pending until verification succeeds.
 
-### Step 7 — authentication verification
+### Step 6: Registration verification
 
-assertion の signed bytes を正確に組み立て、保存済み P-256 公開鍵で ES256 signature を検証します。credential と user handle の結びつき、backup flags、signature counter の扱いも実装します。
+Verify ceremony type, challenge, origin, RP ID hash, UP, UV, attested credential data, credential ID, attestation format, algorithm, curve, coordinate length, and backup flags.
 
-### Step 8 — HTTP API と session
+The lab policy is intentionally narrow:
 
-SwiftNIO で薄い HTTP adapter を作ります。body/header limit、content type、error mapping、request ID、Bearer session、logout を追加し、WebAuthn domain logic と transport を分離します。
+- discoverable credential required;
+- user verification required;
+- ES256/P-256 only;
+- `attestation: none` for privacy and a small trust surface.
 
-## Phase 3: Apple client
+### Step 7: Authentication verification
 
-### Step 9 — iOS registration
+Reconstruct and verify:
 
-`ASAuthorizationPlatformPublicKeyCredentialProvider` で registration request を作り、OS から受け取った credential ID、client data、attestation object を server へ返します。
+```text
+authenticatorData || SHA-256(clientDataJSON)
+```
 
-### Step 10 — iOS authentication
+Then enforce credential ID, user handle, RP ID, origin, UP/UV, backup eligibility, and signature-counter policy.
 
-assertion request、AutoFill-assisted request、cancellation/error handling を実装します。秘密鍵や生体情報がアプリ／サーバーへ渡らないことをデバッガで確認します。
+### Step 8: Sessions and HTTP
 
-### Step 11 — Associated Domains
+Separate the Passkey ceremony from application authentication state. Issue a 256-bit bearer, store only its SHA-256 hash, apply expiry and revocation, and expose the domain through a bounded SwiftNIO adapter.
 
-`webcredentials:<domain>` entitlement と `/.well-known/apple-app-site-association` の双方向の関連づけを構成します。実機、HTTPS、有効な証明書、Apple CDN、development alternate mode の違いを確認します。
+## Phase 3 — Build the Apple client
 
-## Phase 4: 実用設計
+### Step 9: iOS registration
 
-### Step 12 — end-to-end と攻撃テスト
+Use `ASAuthorizationPlatformPublicKeyCredentialProvider` to create a registration request. Forward `credentialID`, `rawClientDataJSON`, and `rawAttestationObject` exactly as returned.
 
-正常系だけでなく、challenge replay、wrong origin、wrong RP ID、missing UV、tampered signature、credential substitution、expired ceremony を fixture で再現します。
+### Step 10: iOS authentication
 
-### Step 13 — credential lifecycle
+Create modal and AutoFill-assisted assertion requests. Forward `rawAuthenticatorData`, `signature`, `userID`, and the untouched client-data JSON.
 
-credential の一覧、表示名変更、追加、失効、全 session revoke、再認証を設計します。「同じ account に複数 credential」を基本モデルにします。
+### Step 11: Associated Domains
 
-### Step 14 — recovery と運用
+Configure both sides of the association:
 
-passkey を全て失った場合の recovery は認証方式全体の強度を決めます。help desk、verified device、recovery code、本人確認を threat model と product policy に合わせて選びます。
+- app entitlement: `webcredentials:<rp-domain>`;
+- server: `/.well-known/apple-app-site-association` with the signed application ID.
 
-### Step 15 — production review
+Test on a real device with HTTPS, signing, Developer Mode, and the appropriate development alternate mode.
 
-永続化、トランザクション、分散 challenge store、key management、TLS、proxy trust、rate limit、observability、privacy、incident response を checklist で確認します。
+## Phase 4 — Make the design operationally honest
 
-## 推奨ペース
+### Step 12: Attack-oriented tests
 
-| 区間 | 目安 | 手を動かす比率 |
+Exercise challenge replay, expiry, wrong type, wrong origin, wrong RP ID, missing UV, credential substitution, altered backup flags, invalid signatures, counter replay, malformed CBOR, oversized HTTP bodies, and session revocation.
+
+### Step 13: Credential lifecycle
+
+Design multiple credentials per account, credential labels, last-used metadata, deletion, step-up before adding a credential, all-session revocation, and account deletion.
+
+### Step 14: Recovery
+
+Recovery defines the effective strength of the authentication system. Evaluate verified devices, recovery codes, identity proofing, help-desk procedures, delays, notifications, and attacker-visible account enumeration.
+
+### Step 15: Production review
+
+Replace the in-memory adapters and evaluate persistence, transactions, distributed challenge use, proxy trust, rate limits, logging, privacy, monitoring, backup/restore, and incident response.
+
+## Suggested pace
+
+| Phase | Time | Hands-on ratio |
 | --- | ---: | ---: |
-| Phase 0 | 2–3 時間 | 40% |
-| Phase 1 | 6–10 時間 | 80% |
-| Phase 2 | 10–16 時間 | 85% |
-| Phase 3 | 6–10 時間 | 80% |
-| Phase 4 | 8–16 時間 | 70% |
+| Foundations | 2–3 hours | 40% |
+| Wire format | 6–10 hours | 80% |
+| RP server | 10–16 hours | 85% |
+| Apple client | 6–10 hours | 80% |
+| Operations | 8–16 hours | 70% |
 
-速さより、「受信した 1 byte がどこから来て、何を信頼してよいか」を追跡できることを優先します。
+Do not optimize for finishing quickly. Optimize for answering: “Where did this byte come from, who controls it, what is it bound to, and why may the RP trust it now?”
 
-## 最終課題
+## Final project
 
-次の条件を満たす小さなサービスを、自分の RP ID と Bundle ID で構築します。
+Build a small service under an RP ID and Bundle ID you control. Completion means:
 
-- iPhone 実機で passkey を登録し、ログインできる
-- credential を二つ登録し、片方を失効できる
-- replay と origin mismatch が server test で拒否される
-- server 再起動後も credential と session policy が意図どおり動く
-- recovery policy と脅威モデルを文章で説明できる
-- production checklist の未達項目を「既知の制約」として列挙できる
+- a real iPhone registers and authenticates with a Passkey;
+- the account can hold at least two credentials and revoke one safely;
+- replay, wrong origin, wrong RP ID, and invalid signature tests fail closed;
+- credentials survive a server restart and challenge consumption remains atomic across instances;
+- the recovery policy and threat model are written down;
+- every unmet production checklist item is recorded as an explicit limitation.

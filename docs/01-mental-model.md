@@ -1,84 +1,131 @@
-# 最初のメンタルモデル
+# The Passkey Mental Model
 
-## 1. 認証で証明したいこと
+## 1. What authentication proves
 
-サーバーが最終的に知りたいのは「この request を送った主体を、どの account として扱ってよいか」です。パスワードでは、client と server が同じ秘密を知っていることを使います。Passkey では、authenticator だけが持つ秘密鍵に、server が一回限りの challenge を署名させます。
+The server ultimately decides which account may authorize a request. A password system asks the client and server to demonstrate knowledge of the same secret. A Passkey system asks an authenticator to prove possession of a private key by signing a fresh server challenge.
 
-server が保存するのは公開鍵です。公開鍵から秘密鍵を復元できないため、credential database が漏れても、それだけで attacker が署名を作ることはできません。
+The server stores the public key. A leaked credential database does not contain the private key needed to create a valid signature.
 
-## 2. 5 つの登場主体
+## 2. The five actors
 
-| 主体 | この教材での実体 | 主な責務 |
+| Actor | This lab | Responsibility |
 | --- | --- | --- |
-| User | iPhone を操作する人 | ceremony に同意し、端末上で user verification を行う |
-| Authenticator | iCloud Keychain と端末の保護領域 | key pair、credential source、署名を管理する |
-| Client platform | iOS / AuthenticationServices | RP と authenticator の仲介、origin/RP scope の強制 |
-| Client application | SwiftUI app | server から options を取得し、OS API と結果を中継する |
-| Relying Party | Swift server | challenge、公開鍵、account、policy を管理し検証する |
+| User | Person operating the iPhone | Consents to a ceremony and completes local verification |
+| Authenticator | Platform authenticator / iCloud Keychain | Creates credential key pairs, protects private keys, and signs |
+| Client platform | iOS / AuthenticationServices | Mediates RP requests and enforces credential scope and user consent |
+| Client application | SwiftUI app | Relays server options to the OS and raw results back to the server |
+| Relying party | Swift server | Generates challenges, verifies bindings/signatures, stores public credentials, and issues app sessions |
 
-Face ID や Touch ID の biometric template は server に送られません。user verification は authenticator が秘密鍵の利用を許可した事実として、authenticator data の UV flag と署名で server へ伝わります。
+Biometric templates do not go to the app or server. Face ID, Touch ID, a device passcode, or another local method authorizes the authenticator to use the private key. The server observes the signed UV flag, not the biometric.
 
-## 3. 二つの ceremony
+## 3. The two ceremonies
 
 ### Registration
 
-1. server が account 用の opaque user handle と random challenge を用意する
-2. client が options を iOS へ渡す
-3. authenticator が RP ID に scoped な key pair を作る
-4. client が public key を含む attestation response を server へ返す
-5. server が challenge、origin、RP ID、flags、format、algorithm を検証する
-6. server が credential ID と public key を account に紐づけて保存する
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as iOS App
+    participant R as RP Server
+    participant OS as AuthenticationServices
+    participant K as Authenticator
+    A->>R: Request registration options
+    R-->>A: challenge, RP, opaque user handle, ceremony ID
+    A->>OS: Registration request
+    OS->>U: Consent and user verification
+    OS->>K: Create RP-scoped key pair
+    K-->>OS: credential ID, public key, authenticator data
+    OS-->>A: clientDataJSON + attestation object
+    A->>R: Complete registration
+    R->>R: Verify all bindings and store public credential atomically
+```
 
-秘密鍵は 3 から外へ出ません。
+The private key never leaves the authenticator.
 
 ### Authentication
 
-1. server が新しい random challenge を用意する
-2. client が challenge と RP ID を iOS へ渡す
-3. authenticator が対象 credential を選び、user consent/verification 後に署名する
-4. client が authenticator data、client data、signature を server へ返す
-5. server が保存済み public key で署名と全ての binding を検証する
-6. server が短命な application session を発行する
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as iOS App
+    participant R as RP Server
+    participant OS as AuthenticationServices
+    participant K as Authenticator
+    A->>R: Request authentication options
+    R-->>A: fresh challenge, RP ID, ceremony ID
+    A->>OS: Assertion request
+    OS->>U: Choose credential and verify user
+    OS->>K: Sign the RP/client context
+    K-->>OS: authenticator data + signature
+    OS-->>A: raw assertion response
+    A->>R: Complete authentication
+    R->>R: Verify signature and bindings
+    R-->>A: Separate application session
+```
 
-Passkey credential と application session は別物です。毎 API request で WebAuthn ceremony を行うのではなく、ログインまたは重要操作の再認証後に server session を使います。
+A Passkey credential and an application session are different objects. WebAuthn proves control of a credential at login or step-up time. The application then uses a scoped, expiring, revocable session for ordinary API calls.
 
-## 4. phishing resistance の正体
+## 4. Where phishing resistance comes from
 
-「秘密を人が入力しない」だけでは不十分です。credential は RP ID に scope され、client data は origin を含み、authenticator data は RP ID の SHA-256 hash を含みます。server が両方を厳密に検証することで、見た目をコピーした別 origin が得た結果を正規サービスで再利用できなくなります。
+“The user does not type a secret” is only part of the answer. A credential is scoped to an RP ID. Client data includes the origin. Authenticator data includes the SHA-256 hash of the RP ID. The server validates both against values it already trusts.
 
-次のどれかを省略すると binding が壊れます。
+Skipping a binding creates a concrete attack:
 
-- challenge: 古い正常 response の replay を許す
-- origin: 悪意ある client origin からの ceremony を許す
-- RP ID hash: 別 RP scope の authenticator data を許す
-- type: registration と authentication の文脈を混同する
-- signature: response の改ざんと秘密鍵 possession を検出できない
-- UP/UV: user presence / verification policy を満たしたか判断できない
+| Check | What it binds | Failure if omitted |
+| --- | --- | --- |
+| challenge | response to one fresh request | replay of a previously valid response |
+| ceremony type | response to create vs get | cross-ceremony context confusion |
+| origin | client context to an allowed HTTPS origin | use of a response initiated by an unexpected origin |
+| RP ID hash | authenticator output to credential scope | acceptance of authenticator data for the wrong RP |
+| signature | authenticator and client bytes to the private key | tampering and lack of possession proof |
+| UP / UV | user interaction and local verification policy | silent or insufficiently verified key use |
 
-## 5. identifier を混ぜない
+The app does not get to declare any check successful. It is a relay across trust boundaries. The RP repeats the verification from raw bytes and server-held expectations.
 
-| 値 | 誰が決めるか | 用途 | 秘密か |
+## 5. Never merge these identifiers
+
+| Value | Created by | Purpose | Secret? |
 | --- | --- | --- | --- |
-| account ID | server | application account の主キー | いいえ |
-| user handle (`user.id`) | server | authenticator が覚える RP 内の opaque ID | いいえ。ただし個人情報を直接入れない |
-| credential ID | authenticator | 公開鍵 credential を特定する | いいえ |
-| challenge | server | ceremony を一回限りにする nonce | 予測不能である必要がある |
-| session token | server | 検証済み login state を参照する bearer secret | はい |
+| account ID | RP | application database primary key | No |
+| user handle (`user.id`) | RP | stable opaque RP-local account ID stored with the credential | No, but avoid personal data |
+| credential ID | authenticator | selects a credential source/public key | No |
+| challenge | RP | makes a ceremony fresh and single-use | Must be unpredictable |
+| ceremony ID | RP | finds server-side expectations | Treat as unguessable but not sufficient authentication |
+| session token | RP | authorizes subsequent application requests | Yes: bearer secret |
 
-email address を user handle にしません。username が変わっても安定し、RP 外で意味を持たない random bytes を使います。
+Do not use an email address as a user handle. A random handle stays stable when a username changes and has no meaning outside the RP.
 
-## 6. synced passkey と counter
+## 6. Synced Passkeys and counters
 
-Passkey は複数端末へ安全に同期されることがあります。authenticator data の BE (backup eligibility) と BS (backup state) はその性質を表します。従来の単一 authenticator を想定した signature counter が常に増えるとは限らず、synced passkey では 0 のままの実装もあります。
+Passkeys may be securely synced across a user's devices. The authenticator flags expose backup eligibility (BE) and current backup state (BS). BS may only be set when BE is set, and BE must not change for a credential.
 
-したがって counter だけを「clone なら必ず検出できる仕組み」と見なしません。counter rollback は risk signal として扱い、credential の backup state、device/session telemetry、再認証 policy と組み合わせます。
+Traditional single-device authenticators often increment `signCount`. Synced implementations may leave it at zero. Therefore:
 
-## 7. 次に観察するもの
+- `0 -> 0` means the counter is unsupported and is not itself a failure;
+- a nonzero counter should advance;
+- a non-advancing nonzero counter is a clone/race risk signal;
+- counter analysis must be combined with backup state, session telemetry, notifications, and recovery policy.
 
-以降では、次の signed message を自分で組み立てて検証します。
+The lab uses a fail-closed policy for nonzero counter rollback while allowing the common `0 -> 0` synced-Passkey case.
+
+## 7. The signed message
+
+Authentication verification centers on this exact byte sequence:
 
 ```text
 authenticatorData || SHA-256(clientDataJSON)
 ```
 
-`clientDataJSON` は challenge と origin を client context に bind し、`authenticatorData` は RP ID、flags、counter を authenticator context に bind します。署名はこの二つを一つの改ざん不能な証明にします。
+`clientDataJSON` binds challenge, type, and origin to the client context. Authenticator data binds RP ID, flags, counter, and extensions to the authenticator context. The signature makes the combined proof tamper-evident and proves possession of the credential private key.
+
+Never decode and re-encode `clientDataJSON` before hashing it. The signature covers the original bytes, not a semantically equivalent JSON document.
+
+## Completion check
+
+Without looking at code, explain:
+
+1. why the server stores a public key but the app never receives the private key;
+2. why both origin and RP ID hash are checked;
+3. why a session token is not a Passkey;
+4. why a zero signature counter is not automatically an attack;
+5. which exact bytes an ES256 assertion signs.

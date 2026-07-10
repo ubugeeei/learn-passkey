@@ -1,33 +1,36 @@
-# 開発環境を作る
+# Build the Development Environment
 
-## この章のゴール
+## Goal
 
-- Nix と Apple toolchain の責務を区別できる
-- server package の build/test command を同じ入口から実行できる
-- iOS 実機 build に必要な Xcode と signing の前提を確認できる
+By the end of this chapter you can:
 
-## なぜ Swift 自体を Nix に入れないのか
+- explain which tools are controlled by Nix and which are controlled by Xcode;
+- build and test the Swift packages through one repeatable command;
+- identify the additional requirements for an iOS device build.
 
-この教材の client は `AuthenticationServices` を使う iOS app です。Apple SDK、iOS Simulator、code signing は Xcode が提供します。macOS 上で Nixpkgs の Swift に置き換えると、使用する Apple SDK と Xcode の組み合わせが不明確になり、client と server で異なる toolchain を誤って検証しやすくなります。
+## Why Swift itself comes from Apple on macOS
 
-そのため責務を次のように分けます。
+The client uses AuthenticationServices, an iOS SDK, simulator/device support, and code signing. Those are supplied as a coherent set by Xcode. Replacing only the compiler with a Nixpkgs Swift build can accidentally mix compiler, SDK, and platform framework versions.
 
-| 管理元 | 管理するもの |
+The environment therefore assigns ownership explicitly:
+
+| Owner | Components |
 | --- | --- |
-| Xcode / Command Line Tools | Swift compiler、Foundation、CryptoKit、AuthenticationServices、Apple SDK、simulator、signing |
-| Nix flake | `just`、`jq`、`curl`、OpenSSL CLI、SQLite CLI、環境変数、補助 command の version |
-| SwiftPM | SwiftNIO、Swift Crypto と package graph |
+| Xcode / Command Line Tools | Swift compiler, Foundation, CryptoKit platform support, AuthenticationServices, Apple SDKs, simulator, signing |
+| Nix flake | `just`, `jq`, `curl`, OpenSSL CLI, SQLite CLI, surrounding versions and environment |
+| SwiftPM | SwiftNIO, Swift Crypto, Swift Testing, and the package graph |
 
-server を Linux に deploy する段階では、CI/container で Swift.org の公式 Linux toolchain version を固定します。Nixpkgs の Swift version が教材の最低 version に追随していると確認できるまでは、暗黙に古い compiler を選びません。
+The flake uses `mkShellNoCC` and a small Swift shim. This matters: injecting Nix's C/C++ compiler into an Apple Swift build can mix libc++ and SDK headers. The shell resets `DEVELOPER_DIR` and `SDKROOT` to the selected Apple developer directory.
 
-## 必要なもの
+## Prerequisites
 
-- macOS
-- Nix with flakes
-- Xcode 26 以降、または server のみなら対応する Command Line Tools
-- iOS client を実機で動かす場合は Apple Developer signing team と HTTPS domain
+- macOS;
+- Nix with flakes enabled;
+- Xcode 26 or compatible Command Line Tools;
+- full Xcode, an Apple Developer signing team, and an iOS device for the native chapter;
+- an HTTPS domain you control for a real Associated Domains test.
 
-現在選択されている developer directory を確認します。
+Inspect the selected developer directory:
 
 ```sh
 xcode-select -p
@@ -35,13 +38,13 @@ xcrun swift --version
 xcodebuild -version
 ```
 
-`xcodebuild` が「CommandLineTools is a command line tools instance」と返す場合、server は build できますが iOS app は build できません。full Xcode をインストール後、必要なら次を実行します。
+If `xcodebuild` reports that the selected directory is only a Command Line Tools instance, the server packages can still build, but the iOS application cannot. After installing Xcode, select it if necessary:
 
 ```sh
 sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 ```
 
-## shell に入る
+## Enter the shell
 
 ```sh
 nix develop
@@ -49,45 +52,61 @@ just setup
 just test
 ```
 
-direnv を使う場合は一度だけ許可します。
+With direnv:
 
 ```sh
 direnv allow
 ```
 
-flake lock は commit されます。更新は意図的に行い、更新後に全 test を実行します。
+The lock file is committed. Update it deliberately and retest everything:
 
 ```sh
 nix flake update
 nix develop --command just test
 ```
 
-## command 一覧
+## Commands
 
 ```sh
-just          # 一覧
-just build    # server と library を build
-just test     # unit/integration tests
-just format   # bundled swift-format で整形
-just lint     # format 差分を作らず検査
-just server   # local RP server
+just             # list tasks
+just setup       # resolve SwiftPM dependencies
+just build       # build libraries and the server executable
+just test        # run all test suites in parallel
+just format      # format package, sources, tests, and app Swift files
+just lint        # check formatting without modifying files
+just server      # run the local HTTP server
+just clean       # remove Swift build artifacts
 ```
 
-`swift format` は選択中の Swift toolchain に同梱された version を使います。compiler と formatter の Swift syntax support を揃えるためです。
+The selected Swift toolchain's bundled `swift format` is used so formatter syntax support tracks the compiler.
 
-## secret と local configuration
+## Secrets and configuration
 
-`.env` は commit しません。secret を Nix store や flake source に書くと world-readable な store path に残り得るためです。教材の local default は secret を必要としません。本番 credential、database DSN、session signing/encryption key は runtime secret store から注入します。
+`.env` is ignored. Do not put runtime secrets into `flake.nix`: Nix store paths are not a secret store and may be readable by other local users or retained in caches.
 
-## 確認問題
+The lab defaults do not require a secret. Production database credentials, encryption/session keys, and infrastructure tokens must come from a runtime secret manager.
 
-1. Nix shell に入っても iOS SDK が Nix から提供されないのはなぜですか。
-2. `swift --version` と `xcrun swift --version` が異なる場合、どちらを build に使うべきですか。
-3. secret を `flake.nix` に直接書いてはいけないのはなぜですか。
+Server environment variables:
 
-## 完了条件
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PASSKEY_RP_ID` | `passkeys.example.com` | credential scope, without scheme |
+| `PASSKEY_RP_NAME` | `Passkey Lab` | user-visible relying-party name |
+| `PASSKEY_ALLOWED_ORIGINS` | `https://passkeys.example.com` | comma-separated exact origins |
+| `PASSKEY_APP_ID` | `TEAMID.com.example.PasskeyLab` | AASA webcredentials application ID |
+| `PASSKEY_HOST` | `127.0.0.1` | HTTP listener host |
+| `PASSKEY_PORT` | `8080` | HTTP listener port |
 
-- `nix flake check` が成功する
-- `nix develop --command swift --version` が選択中の Apple Swift を表示する
-- `nix develop --command just test` が成功する
-- client を進める場合、`xcodebuild -version` が full Xcode を表示する
+## Exercises
+
+1. Compare `command -v swift`, `command -v clang`, and `xcrun --find swift` inside and outside `nix develop`.
+2. Explain why the shell uses Apple Clang rather than Nix Clang for SwiftPM C targets.
+3. Run `nix flake metadata` and locate the pinned Nixpkgs revision.
+4. Confirm that `.env` is not tracked.
+
+## Completion criteria
+
+- `nix flake check` succeeds;
+- `nix develop --command swift --version` reports the intended Apple Swift;
+- `nix develop --command just test` passes;
+- before the iOS chapter, `xcodebuild -version` reports full Xcode.
