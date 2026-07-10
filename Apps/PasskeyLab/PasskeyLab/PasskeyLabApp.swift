@@ -9,7 +9,9 @@ struct PasskeyLabApp: App {
 
   @MainActor
   init() {
-    let api = try! PasskeyAPIClient(baseURL: AppConfiguration.apiBaseURL)
+    guard let api = try? PasskeyAPIClient(baseURL: AppConfiguration.apiBaseURL) else {
+      preconditionFailure("AppConfiguration.apiBaseURL must be an exact HTTPS origin")
+    }
     let authorization = PasskeyAuthorizationService {
       let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
       return

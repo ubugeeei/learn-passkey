@@ -93,6 +93,17 @@ import Testing
     }
   }
 
+  @Test func logoutAcceptsEmpty204AndSendsBearer() async throws {
+    let client = try makeClient { request in
+      #expect(request.url?.path == "/v1/session/logout")
+      #expect(request.httpMethod == "POST")
+      #expect(request.value(forHTTPHeaderField: "authorization") == "Bearer session")
+      return try response(status: 204, body: Data())
+    }
+
+    try await client.logout(sessionToken: "session")
+  }
+
   private func makeClient(
     transport: @escaping PasskeyAPIClient.Transport
   ) throws -> PasskeyAPIClient {

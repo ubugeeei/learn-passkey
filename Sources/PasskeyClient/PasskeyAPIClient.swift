@@ -107,12 +107,11 @@ public struct PasskeyAPIClient: Sendable {
   /// Revokes the presented application session. This does not delete the
   /// Passkey from the authenticator or the public key from the RP.
   public func logout(sessionToken: String) async throws {
-    let _: EmptyResponse = try await send(
+    _ = try await perform(
       path: "/v1/session/logout",
       method: "POST",
       body: Optional<BeginAuthenticationRequest>.none,
-      sessionToken: sessionToken,
-      acceptsEmptyResponse: true
+      sessionToken: sessionToken
     )
   }
 
@@ -127,9 +126,30 @@ public struct PasskeyAPIClient: Sendable {
     path: String,
     method: String,
     body: Body?,
-    sessionToken: String? = nil,
-    acceptsEmptyResponse: Bool = false
+    sessionToken: String? = nil
   ) async throws -> Response {
+    let data = try await perform(
+      path: path,
+      method: method,
+      body: body,
+      sessionToken: sessionToken
+    )
+
+    do {
+      let decoder = JSONDecoder()
+      decoder.dateDecodingStrategy = .iso8601
+      return try decoder.decode(Response.self, from: data)
+    } catch {
+      throw PasskeyAPIClientError.invalidResponseBody
+    }
+  }
+
+  private func perform<Body: Encodable & Sendable>(
+    path: String,
+    method: String,
+    body: Body?,
+    sessionToken: String? = nil
+  ) async throws -> Data {
     guard let url = URL(string: path, relativeTo: baseURL) else {
       throw PasskeyAPIClientError.invalidBaseURL
     }
@@ -156,17 +176,7 @@ public struct PasskeyAPIClient: Sendable {
         requestID: envelope?.requestID
       )
     }
-    if acceptsEmptyResponse, data.isEmpty, Response.self == EmptyResponse.self {
-      return EmptyResponse() as! Response
-    }
-
-    do {
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .iso8601
-      return try decoder.decode(Response.self, from: data)
-    } catch {
-      throw PasskeyAPIClientError.invalidResponseBody
-    }
+    return data
   }
 }
 
@@ -183,5 +193,3 @@ private struct ServerErrorEnvelope: Decodable {
   let message: String
   let requestID: String
 }
-
-private struct EmptyResponse: Codable, Sendable {}
