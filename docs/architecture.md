@@ -24,9 +24,9 @@ flowchart LR
 
 | Port | Teaching adapter | Production adapter responsibility |
 | --- | --- | --- |
-| `CeremonyStore` | actor-backed dictionary | atomic read-delete, TTL, multi-instance consistency, capacity controls |
-| `PasskeyRepository` | actor-backed dictionaries | transactions, uniqueness, indexes, encryption policy, migrations, backups |
-| `SessionStore` | actor-backed hash map | hashed token lookup, expiry index, revocation, incident-wide invalidation |
+| `CeremonyStore` | actor dictionary and atomic SQLite read-delete | shared TTL, multi-instance topology, capacity controls |
+| `PasskeyRepository` | actor dictionaries and transactional SQLite | production database topology, migrations, encryption policy, backups |
+| `SessionStore` | actor hash map and durable SQLite hashes | distributed lookup, expiry cleanup, revocation propagation |
 | `PasskeyAPIClient.Transport` | `URLSession` or test closure | networking policy, metrics, optional pinning, retry classification |
 | `PasskeyHTTPServer` | SwiftNIO HTTP/1.1 | TLS/proxy integration, deadlines, distributed limits, graceful shutdown |
 

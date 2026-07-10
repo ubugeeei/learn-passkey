@@ -30,7 +30,7 @@ flowchart LR
     Phone["Signed iOS app"] -->|HTTPS| Proxy["TLS endpoint for RP domain"]
     Proxy -->|bounded HTTP| Server["PasskeyServerCLI"]
     Phone -->|AASA verification| AASA["/.well-known/apple-app-site-association"]
-    Server --> Store["Lab in-memory stores"]
+    Server --> Store["Single-node SQLite lab database"]
 ```
 
 For a real test, expose the local listener through a TLS reverse proxy or deploy the executable behind HTTPS. The externally visible host must match RP ID/origin/entitlement configuration. Do not forward arbitrary `Host` or origin values into security policy.
@@ -60,7 +60,7 @@ export PASSKEY_PORT=8080
 just server
 ```
 
-The server intentionally prints an in-memory-storage warning. Registration and sessions disappear on restart.
+The server prints the SQLite database path and a single-node deployment warning. Set `PASSKEY_DATABASE_PATH` to choose the file; the default is `passkey-lab.sqlite`.
 
 ## Step 3: Put HTTPS in front
 
@@ -121,11 +121,11 @@ Expected result:
 - logout deletes it;
 - the Passkey remains available for a future login.
 
-## Step 7: Restart and understand the failure
+## Step 7: Restart and verify durability
 
-Restart the lab server. Credentials and sessions are gone because the teaching adapters are in memory. The Passkey may still exist on the device, but the RP no longer has its public key and cannot verify it.
+Restart the lab server with the same `PASSKEY_DATABASE_PATH`. Credentials, unexpired sessions, and issued ceremonies are durable. Authenticate again with the existing device Passkey and confirm the RP still has its public key.
 
-This is the exact reason persistence is part of authentication correctness, not an optional deployment detail.
+Now stop the server, copy the SQLite database and its WAL safely using SQLite backup procedures, and test restore into an isolated environment. Simply deleting the database simulates catastrophic loss: the Passkey remains on the device, but the RP no longer has the public key required to verify it. Persistence, backup, and restore are authentication correctness requirements.
 
 ## Troubleshooting matrix
 
@@ -145,4 +145,4 @@ This is the exact reason persistence is part of authentication correctness, not 
 - Live `/healthz`, AASA, and options routes are verified through the public HTTPS endpoint.
 - A signed real-device app registers and authenticates.
 - Logout revokes only the application session.
-- Server restart behavior is understood and recorded as a lab limitation.
+- Credentials and sessions survive a same-database restart, and backup/restore behavior is tested.

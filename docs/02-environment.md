@@ -96,6 +96,7 @@ Server environment variables:
 | `PASSKEY_APP_ID` | `TEAMID.com.example.PasskeyLab` | AASA webcredentials application ID |
 | `PASSKEY_HOST` | `127.0.0.1` | HTTP listener host |
 | `PASSKEY_PORT` | `8080` | HTTP listener port |
+| `PASSKEY_DATABASE_PATH` | `passkey-lab.sqlite` | SQLite account, credential, ceremony, and session database |
 
 ## Exercises
 

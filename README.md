@@ -43,20 +43,21 @@ The server starts on `http://127.0.0.1:8080`. A native Passkey ceremony requires
 | Path | Responsibility |
 | --- | --- |
 | `Sources/PasskeyCore` | Shared API models, strict Base64url, bounded CBOR, COSE, client data, and authenticator data |
-| `Sources/PasskeyServer` | Ceremony orchestration, verifiers, repository ports, in-memory adapters, and hashed sessions |
+| `Sources/PasskeyServer` | Ceremony orchestration, verifiers, repository ports, in-memory test adapters, and hashed sessions |
+| `Sources/PasskeyPersistence` | Direct SQLite adapters for transactional accounts, atomic ceremonies, and durable hashed sessions |
 | `Sources/PasskeyHTTP` | Safe public error mapping and the bounded SwiftNIO HTTP adapter |
 | `Sources/PasskeyClient` | Typed RP API client and the AuthenticationServices bridge |
 | `Apps/PasskeyLab` | SwiftUI iOS application, entitlement, and local package integration |
 | `Tests` | Unit, integration, attack, transport, and synthetic-authenticator tests |
 | `docs` | The complete hands-on course, architecture, threat model, and reference material |
 
-The current suite contains 45 tests across protocol primitives, ceremonies, sessions, HTTP boundaries, and the client transport. Run `just test` whenever a chapter asks you to change an invariant.
+The current suite contains 52 tests across protocol primitives, ceremonies, persistence, sessions, HTTP boundaries, and the client transport. Run `just test` whenever a chapter asks you to change an invariant.
 
 ## Important scope boundary
 
-The code is deliberately strong at the WebAuthn protocol boundary, but the included process-local storage is a teaching adapter. The executable prints that warning at startup. A production deployment must replace or add:
+The code is deliberately strong at the WebAuthn protocol boundary. The executable uses a durable SQLite teaching adapter, including transactional account creation and atomic ceremony consumption across connections, but it is still a single-node deployment choice. A production deployment must replace or add where required:
 
-- transactional persistent storage and uniqueness constraints;
+- production database topology, migrations, encryption policy, and restore procedures;
 - atomic distributed challenge consumption;
 - TLS termination, trusted-proxy policy, request deadlines, and distributed rate limits;
 - production secret/session storage and incident revocation;

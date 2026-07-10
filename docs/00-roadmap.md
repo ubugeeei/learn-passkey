@@ -120,7 +120,7 @@ Recovery defines the effective strength of the authentication system. Evaluate v
 
 ### Step 15: Production review
 
-Replace the in-memory adapters and evaluate persistence, transactions, distributed challenge use, proxy trust, rate limits, logging, privacy, monitoring, backup/restore, and incident response.
+Evaluate whether the SQLite adapter fits the topology, replace it with a shared store where required, and review transactions, distributed challenge use, proxy trust, rate limits, logging, privacy, monitoring, backup/restore, and incident response.
 
 ## Suggested pace
 

@@ -4,7 +4,7 @@
 
 Success-path tests prove that one valid transcript works. Authentication confidence comes from showing that each altered binding fails for the right reason and that failure does not leave reusable state.
 
-The current suite has 45 tests in 10 suites:
+The current suite has 52 tests in 11 suites:
 
 ```sh
 just test
@@ -117,7 +117,7 @@ Fuzzing is complementary to specification-derived tests. A fuzzer may find a cra
 
 ## Timing and concurrency
 
-Logical single-use behavior must survive concurrency. In-memory actor serialization proves only one process. A production integration test must run two server instances against the same ceremony store and race completion. Exactly one atomic consume may succeed.
+Logical single-use behavior must survive concurrency. In-memory actor serialization proves only one process. The SQLite adapter test races two connections and accepts exactly one consume. A production integration test must repeat this with the actual deployment store and multiple server instances.
 
 Similarly, credential counter updates need an optimistic concurrency or transactional rule. Two valid assertions based on the same stored counter should not both commit silently if your policy treats that as risk.
 

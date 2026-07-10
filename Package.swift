@@ -13,6 +13,7 @@ let package = Package(
     .library(name: "PasskeyClient", targets: ["PasskeyClient"]),
     .library(name: "PasskeyServer", targets: ["PasskeyServer"]),
     .library(name: "PasskeyHTTP", targets: ["PasskeyHTTP"]),
+    .library(name: "PasskeyPersistence", targets: ["PasskeyPersistence"]),
     .executable(name: "PasskeyServerCLI", targets: ["PasskeyServerCLI"]),
   ],
   dependencies: [
@@ -21,6 +22,14 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-testing.git", exact: "6.2.4"),
   ],
   targets: [
+    .systemLibrary(
+      name: "CSQLite",
+      pkgConfig: "sqlite3",
+      providers: [
+        .apt(["libsqlite3-dev"]),
+        .brew(["sqlite3"]),
+      ]
+    ),
     .target(name: "PasskeyCore"),
     .target(
       name: "PasskeyClient",
@@ -43,10 +52,19 @@ let package = Package(
         .product(name: "NIOPosix", package: "swift-nio"),
       ]
     ),
+    .target(
+      name: "PasskeyPersistence",
+      dependencies: [
+        "CSQLite",
+        "PasskeyCore",
+        "PasskeyServer",
+      ]
+    ),
     .executableTarget(
       name: "PasskeyServerCLI",
       dependencies: [
         "PasskeyHTTP",
+        "PasskeyPersistence",
         "PasskeyServer",
       ]
     ),
@@ -80,6 +98,16 @@ let package = Package(
       dependencies: [
         "PasskeyClient",
         "PasskeyCore",
+        .product(name: "Testing", package: "swift-testing"),
+      ]
+    ),
+    .testTarget(
+      name: "PasskeyPersistenceTests",
+      dependencies: [
+        "PasskeyCore",
+        "PasskeyPersistence",
+        "PasskeyServer",
+        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "Testing", package: "swift-testing"),
       ]
     ),

@@ -1,5 +1,6 @@
 import Foundation
 import PasskeyHTTP
+import PasskeyPersistence
 import PasskeyServer
 
 @main
@@ -16,8 +17,9 @@ struct PasskeyServerMain {
     let appID = environment["PASSKEY_APP_ID"] ?? "TEAMID.com.example.PasskeyLab"
     let host = environment["PASSKEY_HOST"] ?? "127.0.0.1"
     let port = Int(environment["PASSKEY_PORT"] ?? "8080") ?? 8080
+    let databasePath = environment["PASSKEY_DATABASE_PATH"] ?? "passkey-lab.sqlite"
 
-    let repository = InMemoryPasskeyRepository()
+    let repository = try SQLitePasskeyRepository(path: databasePath)
     let passkeys = PasskeyService(
       configuration: try RelyingPartyConfiguration(
         id: rpID,
@@ -25,16 +27,17 @@ struct PasskeyServerMain {
         allowedOrigins: allowedOrigins
       ),
       repository: repository,
-      ceremonies: InMemoryCeremonyStore()
+      ceremonies: try SQLiteCeremonyStore(path: databasePath)
     )
-    let sessions = try SessionManager(store: InMemorySessionStore())
+    let sessions = try SessionManager(store: SQLiteSessionStore(path: databasePath))
     let api = PasskeyAPI(
       passkeys: passkeys,
       sessions: sessions,
       appleApplicationID: appID
     )
 
-    print("WARNING: in-memory stores are for the hands-on lab, not production persistence.")
+    print("SQLite lab database: \(databasePath)")
+    print("WARNING: this single-node SQLite adapter is not a distributed production deployment.")
     try PasskeyHTTPServer(api: api).run(host: host, port: port)
   }
 }
