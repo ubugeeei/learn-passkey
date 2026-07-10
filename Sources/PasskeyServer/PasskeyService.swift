@@ -134,6 +134,10 @@ public final class PasskeyService: Sendable {
     }
     return trimmed
   }
+
+  func currentDate() -> Date {
+    now()
+  }
 }
 
 public enum PasskeyServiceError: Error, Equatable, Sendable {
@@ -143,4 +147,6 @@ public enum PasskeyServiceError: Error, Equatable, Sendable {
   case wrongCeremonyType
   case credentialNotFound
   case userMismatch
+  case malformedBase64URL(field: String)
+  case credentialIDMismatch
 }

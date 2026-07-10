@@ -13,13 +13,17 @@ let package = Package(
     .library(name: "PasskeyServer", targets: ["PasskeyServer"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/swiftlang/swift-testing.git", exact: "6.2.4")
+    .package(url: "https://github.com/apple/swift-crypto.git", exact: "3.15.1"),
+    .package(url: "https://github.com/swiftlang/swift-testing.git", exact: "6.2.4"),
   ],
   targets: [
     .target(name: "PasskeyCore"),
     .target(
       name: "PasskeyServer",
-      dependencies: ["PasskeyCore"]
+      dependencies: [
+        "PasskeyCore",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
     ),
     .testTarget(
       name: "PasskeyCoreTests",
@@ -33,6 +37,7 @@ let package = Package(
       dependencies: [
         "PasskeyCore",
         "PasskeyServer",
+        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "Testing", package: "swift-testing"),
       ]
     ),
