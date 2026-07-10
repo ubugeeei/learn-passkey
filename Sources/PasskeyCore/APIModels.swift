@@ -256,3 +256,37 @@ public struct CompleteAuthenticationRequest: Codable, Equatable, Sendable {
     self.response = response
   }
 }
+
+public struct UserSummaryResponse: Codable, Equatable, Sendable {
+  public let id: String
+  public let username: String
+  public let displayName: String
+
+  public init(id: String, username: String, displayName: String) {
+    self.id = id
+    self.username = username
+    self.displayName = displayName
+  }
+}
+
+public struct RegistrationResultResponse: Codable, Equatable, Sendable {
+  public let user: UserSummaryResponse
+  public let credentialID: String
+
+  public init(user: UserSummaryResponse, credentialID: String) {
+    self.user = user
+    self.credentialID = credentialID
+  }
+}
+
+public struct AuthenticationResultResponse: Codable, Equatable, Sendable {
+  public let user: UserSummaryResponse
+  public let sessionToken: String
+  public let expiresAt: Date
+
+  public init(user: UserSummaryResponse, sessionToken: String, expiresAt: Date) {
+    self.user = user
+    self.sessionToken = sessionToken
+    self.expiresAt = expiresAt
+  }
+}
