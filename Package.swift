@@ -10,6 +10,7 @@ let package = Package(
   ],
   products: [
     .library(name: "PasskeyCore", targets: ["PasskeyCore"]),
+    .library(name: "PasskeyClient", targets: ["PasskeyClient"]),
     .library(name: "PasskeyServer", targets: ["PasskeyServer"]),
     .library(name: "PasskeyHTTP", targets: ["PasskeyHTTP"]),
     .executable(name: "PasskeyServerCLI", targets: ["PasskeyServerCLI"]),
@@ -21,6 +22,10 @@ let package = Package(
   ],
   targets: [
     .target(name: "PasskeyCore"),
+    .target(
+      name: "PasskeyClient",
+      dependencies: ["PasskeyCore"]
+    ),
     .target(
       name: "PasskeyServer",
       dependencies: [
@@ -67,6 +72,14 @@ let package = Package(
         "PasskeyCore",
         "PasskeyHTTP",
         "PasskeyServer",
+        .product(name: "Testing", package: "swift-testing"),
+      ]
+    ),
+    .testTarget(
+      name: "PasskeyClientTests",
+      dependencies: [
+        "PasskeyClient",
+        "PasskeyCore",
         .product(name: "Testing", package: "swift-testing"),
       ]
     ),
