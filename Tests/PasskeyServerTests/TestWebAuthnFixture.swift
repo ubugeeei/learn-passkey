@@ -20,7 +20,8 @@ struct TestAuthenticator {
     options: RegistrationOptionsResponse,
     origin: String = "https://passkeys.example.com",
     rpID: String = "passkeys.example.com",
-    includeUserVerification: Bool = true
+    includeUserVerification: Bool = true,
+    publicKeyX963: Data? = nil
   ) throws -> CompleteRegistrationRequest {
     let clientDataJSON = try makeClientDataJSON(
       type: "webauthn.create",
@@ -29,7 +30,8 @@ struct TestAuthenticator {
     )
     let authData = registrationAuthenticatorData(
       rpID: rpID,
-      includeUserVerification: includeUserVerification
+      includeUserVerification: includeUserVerification,
+      publicKeyX963: publicKeyX963
     )
     let attestationObject = TestCBOREncoder.map([
       (.text("fmt"), .text("none")),
@@ -89,7 +91,8 @@ struct TestAuthenticator {
 
   private func registrationAuthenticatorData(
     rpID: String,
-    includeUserVerification: Bool
+    includeUserVerification: Bool,
+    publicKeyX963: Data?
   ) -> Data {
     var flags =
       AuthenticatorFlags.userPresent.rawValue
@@ -98,7 +101,7 @@ struct TestAuthenticator {
       flags |= AuthenticatorFlags.userVerified.rawValue
     }
 
-    let publicKey = privateKey.publicKey.x963Representation
+    let publicKey = publicKeyX963 ?? privateKey.publicKey.x963Representation
     let x = publicKey.subdata(in: 1..<33)
     let y = publicKey.subdata(in: 33..<65)
     let coseKey = TestCBOREncoder.map([

@@ -119,6 +119,13 @@ public enum RegistrationVerifier {
     guard credential.credentialID.constantTimeEquals(input.credentialID) else {
       throw RegistrationVerificationError.credentialIDMismatch
     }
+    guard
+      WebAuthnCrypto.isValidP256PublicKey(
+        x963Representation: credential.credentialPublicKey.x963Representation
+      )
+    else {
+      throw RegistrationVerificationError.invalidPublicKey
+    }
 
     return RegisteredCredentialMaterial(
       id: credential.credentialID,
@@ -145,4 +152,5 @@ public enum RegistrationVerificationError: Error, Equatable, Sendable {
   case userVerificationRequired
   case missingAttestedCredentialData
   case credentialIDMismatch
+  case invalidPublicKey
 }

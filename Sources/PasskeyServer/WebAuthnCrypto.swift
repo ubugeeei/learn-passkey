@@ -15,4 +15,8 @@ enum WebAuthnCrypto {
     let signature = try P256.Signing.ECDSASignature(derRepresentation: signatureDER)
     return publicKey.isValidSignature(signature, for: signedData)
   }
+
+  static func isValidP256PublicKey(x963Representation: Data) -> Bool {
+    (try? P256.Signing.PublicKey(x963Representation: x963Representation)) != nil
+  }
 }

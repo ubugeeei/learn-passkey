@@ -97,6 +97,23 @@ import Testing
     }
   }
 
+  @Test func rejectsCoordinatesThatAreNotAPointOnP256() async throws {
+    let service = try makeService()
+    let authenticator = TestAuthenticator()
+    let options = try await service.beginRegistration(
+      username: "alice@example.com",
+      displayName: "Alice"
+    )
+    let request = try authenticator.registrationRequest(
+      options: options,
+      publicKeyX963: Data([0x04]) + Data(repeating: 0, count: 64)
+    )
+
+    await #expect(throws: RegistrationVerificationError.invalidPublicKey) {
+      try await service.completeRegistration(request)
+    }
+  }
+
   @Test func rejectsAValidSignatureWhenCounterDoesNotAdvance() async throws {
     let service = try makeService()
     let authenticator = TestAuthenticator()
