@@ -94,7 +94,7 @@ final class PasskeyViewModel {
     if let error = error as? PasskeyAPIClientError {
       switch error {
       case .server(_, let code, _, let requestID):
-        return [code, requestID].compactMap { $0 }.joined(separator: " · ")
+        return [code, requestID].compactMap { $0 }.joined(separator: " | ")
       case .invalidBaseURL:
         return "The API base URL is invalid."
       case .nonHTTPResponse, .invalidResponseBody:
