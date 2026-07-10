@@ -1,5 +1,6 @@
 import Foundation
 
+/// Sendable transport-neutral request data copied out of a NIO channel.
 public struct HTTPRequestData: Sendable {
   public let method: String
   public let path: String
@@ -22,6 +23,7 @@ public struct HTTPRequestData: Sendable {
   }
 }
 
+/// Transport-neutral response data written back by the NIO adapter.
 public struct HTTPResponseData: Sendable {
   public let status: Int
   public let headers: [String: String]

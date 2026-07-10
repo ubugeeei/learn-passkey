@@ -1,5 +1,6 @@
 import Foundation
 
+/// Structural or policy failure while interpreting a COSE_Key.
 public enum COSEKeyError: Error, Equatable, Sendable {
   case expectedMap
   case missingParameter(Int64)
@@ -10,6 +11,10 @@ public enum COSEKeyError: Error, Equatable, Sendable {
   case invalidCoordinateLength(parameter: Int64, actual: Int)
 }
 
+/// A validated ES256 public key encoded as a COSE EC2/P-256 key.
+///
+/// The lab intentionally accepts one algorithm so algorithm negotiation cannot
+/// silently downgrade verification or reinterpret key material.
 public struct COSEEC2PublicKey: Equatable, Sendable {
   public static let keyTypeEC2: Int64 = 2
   public static let algorithmES256: Int64 = -7
@@ -39,6 +44,7 @@ public struct COSEEC2PublicKey: Equatable, Sendable {
     self.y = y
   }
 
+  /// Extracts mandatory COSE labels and validates their types and lengths.
   public init(cbor: CBORValue) throws {
     guard cbor.mapEntries != nil else { throw COSEKeyError.expectedMap }
 

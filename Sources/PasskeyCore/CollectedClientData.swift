@@ -1,10 +1,16 @@
 import Foundation
 
+/// Values of `CollectedClientData.type` that separate registration from
+/// authentication signatures.
 public enum WebAuthnCeremonyType: String, Codable, Sendable {
   case create = "webauthn.create"
   case get = "webauthn.get"
 }
 
+/// The client context embedded in `clientDataJSON` by the WebAuthn client.
+///
+/// The server hashes the original JSON bytes for signature verification; this
+/// decoded representation is only for policy checks.
 public struct CollectedClientData: Decodable, Equatable, Sendable {
   public let type: String
   public let challenge: String
@@ -27,6 +33,7 @@ public struct CollectedClientData: Decodable, Equatable, Sendable {
   }
 }
 
+/// A precise reason why client data failed an RP binding check.
 public enum ClientDataValidationError: Error, Equatable, Sendable {
   case tooLarge(actual: Int, maximum: Int)
   case malformedJSON
@@ -38,6 +45,7 @@ public enum ClientDataValidationError: Error, Equatable, Sendable {
   case topOriginNotAllowed
 }
 
+/// Validated fields paired with the untouched bytes used by the signature.
 public struct ValidatedClientData: Sendable {
   public let decoded: CollectedClientData
   public let rawJSON: Data
@@ -48,9 +56,15 @@ public struct ValidatedClientData: Sendable {
   }
 }
 
+/// Applies ceremony type, challenge, origin, and cross-origin policy checks to
+/// `clientDataJSON` before any credential is accepted.
 public enum ClientDataValidator {
   public static let defaultMaximumByteCount = 8 * 1024
 
+  /// Validates client data against server-held expectations.
+  ///
+  /// - Important: `expectedChallenge` must come from a consumed, single-use
+  ///   ceremony record. Values echoed from the request are not expectations.
   public static func validate(
     _ rawJSON: Data,
     expectedType: WebAuthnCeremonyType,

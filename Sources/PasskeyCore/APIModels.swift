@@ -1,9 +1,14 @@
 import Foundation
 
+/// The only credential type currently defined by WebAuthn.
 public enum PublicKeyCredentialType: String, Codable, Sendable {
   case publicKey = "public-key"
 }
 
+/// Hints describing how a client may communicate with an authenticator.
+///
+/// A relying party must treat transports as routing hints, not proof of an
+/// authenticator's security properties.
 public enum AuthenticatorTransport: String, Codable, Sendable {
   case ble
   case hybrid
@@ -13,6 +18,8 @@ public enum AuthenticatorTransport: String, Codable, Sendable {
   case usb
 }
 
+/// Identifies an existing credential in `allowCredentials` or
+/// `excludeCredentials` without exposing its public key.
 public struct PublicKeyCredentialDescriptor: Codable, Equatable, Sendable {
   public let type: PublicKeyCredentialType
   public let id: String
@@ -29,6 +36,7 @@ public struct PublicKeyCredentialDescriptor: Codable, Equatable, Sendable {
   }
 }
 
+/// The relying party identity shown to the user during registration.
 public struct PublicKeyCredentialRP: Codable, Equatable, Sendable {
   public let id: String
   public let name: String
@@ -39,6 +47,10 @@ public struct PublicKeyCredentialRP: Codable, Equatable, Sendable {
   }
 }
 
+/// Account data passed to the authenticator during registration.
+///
+/// `id` is an unpadded Base64url-encoded opaque user handle. It must not be an
+/// email address or another cross-service identifier.
 public struct PublicKeyCredentialUser: Codable, Equatable, Sendable {
   public let id: String
   public let name: String
@@ -51,6 +63,7 @@ public struct PublicKeyCredentialUser: Codable, Equatable, Sendable {
   }
 }
 
+/// A credential type and COSE algorithm pair accepted by the RP.
 public struct PublicKeyCredentialParameters: Codable, Equatable, Sendable {
   public let type: PublicKeyCredentialType
   public let alg: Int
@@ -61,18 +74,21 @@ public struct PublicKeyCredentialParameters: Codable, Equatable, Sendable {
   }
 }
 
+/// The RP's discoverable-credential requirement.
 public enum ResidentKeyRequirement: String, Codable, Sendable {
   case discouraged
   case preferred
   case required
 }
 
+/// The RP's policy for authenticator-local user verification.
 public enum UserVerificationRequirement: String, Codable, Sendable {
   case discouraged
   case preferred
   case required
 }
 
+/// How much authenticator attestation information the client should return.
 public enum AttestationConveyancePreference: String, Codable, Sendable {
   case direct
   case enterprise
@@ -80,6 +96,7 @@ public enum AttestationConveyancePreference: String, Codable, Sendable {
   case none
 }
 
+/// Registration policy that influences which authenticators are eligible.
 public struct AuthenticatorSelectionCriteria: Codable, Equatable, Sendable {
   public let residentKey: ResidentKeyRequirement
   public let userVerification: UserVerificationRequirement
@@ -93,6 +110,9 @@ public struct AuthenticatorSelectionCriteria: Codable, Equatable, Sendable {
   }
 }
 
+/// Server-generated inputs for one registration ceremony.
+///
+/// The challenge is single-use and expires with the enclosing `ceremonyID`.
 public struct PublicKeyCredentialCreationOptions: Codable, Equatable, Sendable {
   public let rp: PublicKeyCredentialRP
   public let user: PublicKeyCredentialUser
@@ -124,6 +144,7 @@ public struct PublicKeyCredentialCreationOptions: Codable, Equatable, Sendable {
   }
 }
 
+/// Server-generated inputs for one authentication ceremony.
 public struct PublicKeyCredentialRequestOptions: Codable, Equatable, Sendable {
   public let challenge: String
   public let timeout: Int
@@ -146,6 +167,7 @@ public struct PublicKeyCredentialRequestOptions: Codable, Equatable, Sendable {
   }
 }
 
+/// Registration options plus the opaque server-side ceremony lookup key.
 public struct RegistrationOptionsResponse: Codable, Equatable, Sendable {
   public let ceremonyID: String
   public let publicKey: PublicKeyCredentialCreationOptions
@@ -156,6 +178,7 @@ public struct RegistrationOptionsResponse: Codable, Equatable, Sendable {
   }
 }
 
+/// Authentication options plus the opaque server-side ceremony lookup key.
 public struct AuthenticationOptionsResponse: Codable, Equatable, Sendable {
   public let ceremonyID: String
   public let publicKey: PublicKeyCredentialRequestOptions
@@ -166,6 +189,7 @@ public struct AuthenticationOptionsResponse: Codable, Equatable, Sendable {
   }
 }
 
+/// User-supplied labels used to begin first-credential account creation.
 public struct BeginRegistrationRequest: Codable, Equatable, Sendable {
   public let username: String
   public let displayName: String
@@ -176,6 +200,9 @@ public struct BeginRegistrationRequest: Codable, Equatable, Sendable {
   }
 }
 
+/// An optional username hint for authentication.
+///
+/// `nil` selects the discoverable, username-less Passkey flow.
 public struct BeginAuthenticationRequest: Codable, Equatable, Sendable {
   public let username: String?
 
@@ -184,6 +211,7 @@ public struct BeginAuthenticationRequest: Codable, Equatable, Sendable {
   }
 }
 
+/// Base64url-encoded raw bytes returned by a registration authorization.
 public struct RegistrationCredentialResponse: Codable, Equatable, Sendable {
   public let clientDataJSON: String
   public let attestationObject: String
@@ -194,6 +222,7 @@ public struct RegistrationCredentialResponse: Codable, Equatable, Sendable {
   }
 }
 
+/// The public-key credential returned to the RP after OS authorization.
 public struct CompleteRegistrationRequest: Codable, Equatable, Sendable {
   public let ceremonyID: String
   public let id: String
@@ -216,6 +245,7 @@ public struct CompleteRegistrationRequest: Codable, Equatable, Sendable {
   }
 }
 
+/// Base64url-encoded raw assertion fields returned by the authenticator.
 public struct AuthenticationCredentialResponse: Codable, Equatable, Sendable {
   public let clientDataJSON: String
   public let authenticatorData: String
@@ -235,6 +265,7 @@ public struct AuthenticationCredentialResponse: Codable, Equatable, Sendable {
   }
 }
 
+/// The assertion returned to the RP for cryptographic verification.
 public struct CompleteAuthenticationRequest: Codable, Equatable, Sendable {
   public let ceremonyID: String
   public let id: String
@@ -257,6 +288,7 @@ public struct CompleteAuthenticationRequest: Codable, Equatable, Sendable {
   }
 }
 
+/// Non-sensitive account information returned to an authenticated client.
 public struct UserSummaryResponse: Codable, Equatable, Sendable {
   public let id: String
   public let username: String
@@ -269,6 +301,7 @@ public struct UserSummaryResponse: Codable, Equatable, Sendable {
   }
 }
 
+/// Confirms that the RP atomically stored an account and its first credential.
 public struct RegistrationResultResponse: Codable, Equatable, Sendable {
   public let user: UserSummaryResponse
   public let credentialID: String
@@ -279,6 +312,7 @@ public struct RegistrationResultResponse: Codable, Equatable, Sendable {
   }
 }
 
+/// A verified account and the separate application session it authorized.
 public struct AuthenticationResultResponse: Codable, Equatable, Sendable {
   public let user: UserSummaryResponse
   public let sessionToken: String

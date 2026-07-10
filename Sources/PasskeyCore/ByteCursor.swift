@@ -1,5 +1,6 @@
 import Foundation
 
+/// Bounds and completeness failures while parsing an untrusted byte sequence.
 public enum ByteCursorError: Error, Equatable, Sendable {
   case outOfBounds(requested: Int, remaining: Int)
   case integerOverflow
@@ -38,6 +39,7 @@ public struct ByteCursor: Sendable {
     return bytes[offset]
   }
 
+  /// Reads exactly `count` bytes or leaves the cursor unchanged on failure.
   public mutating func read(_ count: Int) throws -> Data {
     guard count >= 0, count <= remainingCount else {
       throw ByteCursorError.outOfBounds(requested: count, remaining: remainingCount)
@@ -57,6 +59,7 @@ public struct ByteCursor: Sendable {
     return value.reduce(UInt32.zero) { ($0 << 8) | UInt32($1) }
   }
 
+  /// Rejects unparsed trailing bytes after the expected structure.
   public mutating func requireEnd() throws {
     guard isAtEnd else {
       throw ByteCursorError.trailingBytes(count: remainingCount)

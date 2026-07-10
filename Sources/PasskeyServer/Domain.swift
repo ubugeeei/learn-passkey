@@ -1,6 +1,7 @@
 import Foundation
 import PasskeyCore
 
+/// An RP-local account with a stable, opaque WebAuthn user handle.
 public struct UserAccount: Equatable, Sendable {
   public let id: UUID
   public let userHandle: Data
@@ -23,6 +24,10 @@ public struct UserAccount: Equatable, Sendable {
   }
 }
 
+/// Public credential state stored by the RP after successful registration.
+///
+/// This record never contains a Passkey private key or biometric information.
+/// Mutable fields are limited to counter, backup state, and last-use metadata.
 public struct CredentialRecord: Equatable, Sendable {
   public let id: Data
   public let userID: UUID
@@ -63,6 +68,7 @@ public struct CredentialRecord: Equatable, Sendable {
   }
 }
 
+/// Account data held only inside a registration ceremony until verification.
 public struct PendingRegistration: Equatable, Sendable {
   public let user: UserAccount
 
@@ -71,11 +77,13 @@ public struct PendingRegistration: Equatable, Sendable {
   }
 }
 
+/// Server-side context that prevents registration/authentication confusion.
 public enum CeremonyPurpose: Equatable, Sendable {
   case registration(PendingRegistration)
   case authentication(expectedUserID: UUID?, requireUserHandle: Bool)
 }
 
+/// Single-use server state that binds a challenge to purpose and expiry.
 public struct CeremonyState: Equatable, Sendable {
   public let id: String
   public let challenge: Data

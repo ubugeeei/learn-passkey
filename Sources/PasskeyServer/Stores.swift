@@ -1,16 +1,25 @@
 import Foundation
 
+/// Persistence boundary for single-use ceremony state.
+///
+/// A distributed implementation must make `consume` an atomic read-and-delete
+/// operation so two processes cannot accept the same challenge.
 public protocol CeremonyStore: Sendable {
   func save(_ state: CeremonyState) async throws
   func consume(id: String, at now: Date) async throws -> CeremonyState
 }
 
+/// Expected ceremony lifecycle failures safe for service-level mapping.
 public enum CeremonyStoreError: Error, Equatable, Sendable {
   case duplicateID
   case notFound
   case expired
 }
 
+/// Process-local ceremony storage for tests and the hands-on server.
+///
+/// It is concurrency-safe but intentionally not restart-safe or suitable for a
+/// multi-instance deployment.
 public actor InMemoryCeremonyStore: CeremonyStore {
   private var states: [String: CeremonyState] = [:]
 
@@ -38,6 +47,7 @@ public actor InMemoryCeremonyStore: CeremonyStore {
   }
 }
 
+/// Atomic persistence boundary for accounts and public-key credentials.
 public protocol PasskeyRepository: Sendable {
   func user(named username: String) async throws -> UserAccount?
   func user(id: UUID) async throws -> UserAccount?
@@ -52,12 +62,17 @@ public protocol PasskeyRepository: Sendable {
   ) async throws
 }
 
+/// Uniqueness and lookup failures raised by a credential repository.
 public enum PasskeyRepositoryError: Error, Equatable, Sendable {
   case usernameAlreadyExists
   case credentialAlreadyExists
   case credentialNotFound
 }
 
+/// Process-local account and credential storage used by the lab.
+///
+/// `create(user:credential:)` commits the account and first credential together
+/// so a failed registration never leaves a passwordless, unreachable account.
 public actor InMemoryPasskeyRepository: PasskeyRepository {
   private var usersByID: [UUID: UserAccount] = [:]
   private var userIDsByUsername: [String: UUID] = [:]

@@ -1,5 +1,6 @@
 import Foundation
 
+/// Non-canonical or malformed Base64url input.
 public enum Base64URLError: Error, Equatable, Sendable {
   case containsPadding
   case invalidAlphabet

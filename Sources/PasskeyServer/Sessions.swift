@@ -1,6 +1,7 @@
 import Foundation
 import PasskeyCore
 
+/// Server-side application session state keyed by a bearer-token hash.
 public struct SessionRecord: Equatable, Sendable {
   public let tokenHash: Data
   public let userID: UUID
@@ -15,6 +16,7 @@ public struct SessionRecord: Equatable, Sendable {
   }
 }
 
+/// A newly issued bearer returned exactly once to the authenticated client.
 public struct IssuedSession: Equatable, Sendable {
   public let token: String
   public let userID: UUID
@@ -27,6 +29,7 @@ public struct IssuedSession: Equatable, Sendable {
   }
 }
 
+/// Persistence boundary for hashed application sessions.
 public protocol SessionStore: Sendable {
   func save(_ session: SessionRecord) async throws
   func find(tokenHash: Data, at now: Date) async throws -> SessionRecord?
@@ -34,10 +37,12 @@ public protocol SessionStore: Sendable {
   func deleteAll(userID: UUID) async throws
 }
 
+/// Session persistence failures that may be retried by an adapter.
 public enum SessionStoreError: Error, Equatable, Sendable {
   case duplicateTokenHash
 }
 
+/// Process-local session storage for the lab and unit tests.
 public actor InMemorySessionStore: SessionStore {
   private var records: [Data: SessionRecord] = [:]
 
@@ -72,6 +77,11 @@ public actor InMemorySessionStore: SessionStore {
   }
 }
 
+/// Issues, authenticates, and revokes application bearer sessions.
+///
+/// Only SHA-256 token hashes reach the store. A database disclosure therefore
+/// does not directly disclose active bearer strings, although online guessing,
+/// endpoint compromise, and memory disclosure remain in the threat model.
 public final class SessionManager: Sendable {
   public let store: any SessionStore
   public let timeToLive: TimeInterval
@@ -94,6 +104,7 @@ public final class SessionManager: Sendable {
     self.randomBytes = randomBytes
   }
 
+  /// Generates a 256-bit bearer and persists only its hash.
   public func issue(userID: UUID) async throws -> IssuedSession {
     let rawToken = try randomBytes(32)
     let issuedAt = now()
@@ -113,6 +124,7 @@ public final class SessionManager: Sendable {
     )
   }
 
+  /// Resolves an unexpired bearer to its account without extending expiry.
   public func authenticate(token: String) async throws -> UUID {
     let rawToken: Data
     do {
@@ -131,6 +143,7 @@ public final class SessionManager: Sendable {
     return session.userID
   }
 
+  /// Revokes one presented bearer. Revocation is idempotent for a valid shape.
   public func revoke(token: String) async throws {
     let rawToken: Data
     do {
@@ -144,11 +157,13 @@ public final class SessionManager: Sendable {
     try await store.delete(tokenHash: WebAuthnCrypto.sha256(rawToken))
   }
 
+  /// Revokes every application session for an account.
   public func revokeAll(userID: UUID) async throws {
     try await store.deleteAll(userID: userID)
   }
 }
 
+/// Session policy or bearer validation failures.
 public enum SessionManagerError: Error, Equatable, Sendable {
   case invalidTimeToLive
   case invalidSession

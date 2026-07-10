@@ -1,6 +1,7 @@
 import Foundation
 import PasskeyCore
 
+/// Untrusted assertion bytes received from a client.
 public struct AuthenticationVerificationInput: Equatable, Sendable {
   public let credentialID: Data
   public let clientDataJSON: Data
@@ -23,6 +24,7 @@ public struct AuthenticationVerificationInput: Equatable, Sendable {
   }
 }
 
+/// Trusted RP values retained from authentication option generation.
 public struct AuthenticationExpectation: Equatable, Sendable {
   public let challenge: Data
   public let rpID: String
@@ -45,6 +47,7 @@ public struct AuthenticationExpectation: Equatable, Sendable {
   }
 }
 
+/// Mutable credential metadata accepted from a verified assertion.
 public struct AuthenticationVerificationResult: Equatable, Sendable {
   public let signCount: UInt32
   public let backupState: Bool
@@ -55,7 +58,10 @@ public struct AuthenticationVerificationResult: Equatable, Sendable {
   }
 }
 
+/// Verifies an ES256 assertion against a previously stored credential.
 public enum AuthenticationVerifier {
+  /// Reconstructs `authenticatorData || SHA-256(clientDataJSON)` from exact raw
+  /// bytes, validates it, then applies user-handle, backup, and counter policy.
   public static func verify(
     _ input: AuthenticationVerificationInput,
     credential: CredentialRecord,
@@ -143,6 +149,7 @@ public enum AuthenticationVerifier {
   }
 }
 
+/// A specific assertion verification failure for tests and internal audit use.
 public enum AuthenticationVerificationError: Error, Equatable, Sendable {
   case credentialIDMismatch
   case clientData(ClientDataValidationError)

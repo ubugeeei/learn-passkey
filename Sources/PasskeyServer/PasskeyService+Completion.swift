@@ -1,6 +1,7 @@
 import Foundation
 import PasskeyCore
 
+/// Domain objects committed by a verified registration.
 public struct RegistrationCompletionResult: Equatable, Sendable {
   public let user: UserAccount
   public let credential: CredentialRecord
@@ -11,6 +12,7 @@ public struct RegistrationCompletionResult: Equatable, Sendable {
   }
 }
 
+/// Updated domain objects produced by a verified assertion.
 public struct AuthenticationCompletionResult: Equatable, Sendable {
   public let user: UserAccount
   public let credential: CredentialRecord
@@ -22,6 +24,8 @@ public struct AuthenticationCompletionResult: Equatable, Sendable {
 }
 
 extension PasskeyService {
+  /// Consumes a registration challenge, verifies every RP binding, and
+  /// atomically creates the account and its first credential.
   public func completeRegistration(
     _ request: CompleteRegistrationRequest
   ) async throws -> RegistrationCompletionResult {
@@ -67,6 +71,10 @@ extension PasskeyService {
     return RegistrationCompletionResult(user: pending.user, credential: credential)
   }
 
+  /// Consumes an authentication challenge, verifies the ES256 assertion, and
+  /// updates counter/backup metadata before returning the account.
+  ///
+  /// Application session issuance deliberately happens outside this method.
   public func completeAuthentication(
     _ request: CompleteAuthenticationRequest
   ) async throws -> AuthenticationCompletionResult {

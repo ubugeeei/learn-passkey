@@ -1,6 +1,7 @@
 import Foundation
 import PasskeyCore
 
+/// Untrusted registration response bytes received from a client.
 public struct RegistrationVerificationInput: Equatable, Sendable {
   public let credentialID: Data
   public let clientDataJSON: Data
@@ -13,6 +14,7 @@ public struct RegistrationVerificationInput: Equatable, Sendable {
   }
 }
 
+/// Trusted RP values retained from registration option generation.
 public struct RegistrationExpectation: Equatable, Sendable {
   public let challenge: Data
   public let rpID: String
@@ -32,6 +34,7 @@ public struct RegistrationExpectation: Equatable, Sendable {
   }
 }
 
+/// Public credential material extracted only after all checks pass.
 public struct RegisteredCredentialMaterial: Equatable, Sendable {
   public let id: Data
   public let publicKey: COSEEC2PublicKey
@@ -60,7 +63,10 @@ public struct RegisteredCredentialMaterial: Equatable, Sendable {
   }
 }
 
+/// Implements the RP's `none`-attestation ES256 registration policy.
 public enum RegistrationVerifier {
+  /// Verifies challenge/origin/RP bindings, flags, attestation shape, credential
+  /// identity, and the COSE public key before returning storable material.
   public static func verify(
     _ input: RegistrationVerificationInput,
     expecting expectation: RegistrationExpectation
@@ -126,6 +132,8 @@ public enum RegistrationVerifier {
   }
 }
 
+/// A specific registration verification failure, useful in tests and internal
+/// audit events but mapped to a coarse public API error.
 public enum RegistrationVerificationError: Error, Equatable, Sendable {
   case invalidCredentialIDLength(Int)
   case clientData(ClientDataValidationError)

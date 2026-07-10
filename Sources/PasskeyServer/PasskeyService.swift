@@ -1,6 +1,10 @@
 import Foundation
 import PasskeyCore
 
+/// Coordinates WebAuthn ceremonies without depending on HTTP or UI types.
+///
+/// The service generates server-held expectations, consumes them once, invokes
+/// pure verifiers, and commits verified public state through repository ports.
 public final class PasskeyService: Sendable {
   public let configuration: RelyingPartyConfiguration
   public let repository: any PasskeyRepository
@@ -23,6 +27,10 @@ public final class PasskeyService: Sendable {
     self.randomBytes = randomBytes
   }
 
+  /// Starts first-credential account creation without persisting the account.
+  ///
+  /// Existing usernames are rejected. Adding a credential to an existing
+  /// account requires a separate authenticated, step-up-protected flow.
   public func beginRegistration(
     username: String,
     displayName: String
@@ -69,6 +77,10 @@ public final class PasskeyService: Sendable {
     )
   }
 
+  /// Starts authentication with either a username hint or discoverable flow.
+  ///
+  /// A missing/unknown username produces an empty allow-list; credential and
+  /// user-handle binding is still enforced when the assertion returns.
   public func beginAuthentication(
     username: String? = nil
   ) async throws -> AuthenticationOptionsResponse {
@@ -140,6 +152,7 @@ public final class PasskeyService: Sendable {
   }
 }
 
+/// Workflow failures that are independent of cryptographic parsing details.
 public enum PasskeyServiceError: Error, Equatable, Sendable {
   case invalidUsername
   case invalidDisplayName

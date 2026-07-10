@@ -1,5 +1,6 @@
 import Foundation
 
+/// Bit flags signed by the authenticator as part of authenticator data.
 public struct AuthenticatorFlags: OptionSet, Equatable, Sendable {
   public let rawValue: UInt8
 
@@ -17,6 +18,7 @@ public struct AuthenticatorFlags: OptionSet, Equatable, Sendable {
   public static let reservedMask: UInt8 = (1 << 1) | (1 << 5)
 }
 
+/// Registration-only public credential data embedded after the fixed header.
 public struct AttestedCredentialData: Equatable, Sendable {
   public let aaguid: Data
   public let credentialID: Data
@@ -36,6 +38,10 @@ public struct AttestedCredentialData: Equatable, Sendable {
   }
 }
 
+/// The signed authenticator data structure defined by WebAuthn.
+///
+/// Parsing rejects reserved flags, invalid backup-state combinations, trailing
+/// bytes, malformed credential keys, and malformed extension CBOR.
 public struct AuthenticatorData: Equatable, Sendable {
   public static let fixedHeaderLength = 37
 
@@ -46,6 +52,8 @@ public struct AuthenticatorData: Equatable, Sendable {
   public let attestedCredential: AttestedCredentialData?
   public let extensions: CBORValue?
 
+  /// Parses bytes while retaining the exact original representation used by
+  /// assertion signature verification.
   public init(rawBytes: Data, cborLimits: CBORLimits = CBORLimits()) throws {
     guard rawBytes.count >= Self.fixedHeaderLength else {
       throw AuthenticatorDataError.tooShort(actual: rawBytes.count)
@@ -108,6 +116,7 @@ public struct AuthenticatorData: Equatable, Sendable {
   }
 }
 
+/// Structural failures found before RP-specific flag policy is applied.
 public enum AuthenticatorDataError: Error, Equatable, Sendable {
   case tooShort(actual: Int)
   case reservedFlagsSet(UInt8)
@@ -117,6 +126,8 @@ public enum AuthenticatorDataError: Error, Equatable, Sendable {
   case missingExtensionData
 }
 
+/// The CBOR registration envelope containing format, authenticator data, and an
+/// attestation statement.
 public struct AttestationObject: Equatable, Sendable {
   public let format: String
   public let authenticatorData: AuthenticatorData
@@ -144,6 +155,7 @@ public struct AttestationObject: Equatable, Sendable {
   }
 }
 
+/// Missing or incorrectly typed mandatory attestation object fields.
 public enum AttestationObjectError: Error, Equatable, Sendable {
   case expectedMap
   case missingFormat

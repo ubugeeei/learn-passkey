@@ -1,6 +1,11 @@
 import Foundation
 import PasskeyCore
 
+/// Immutable RP policy shared by option generation and response verification.
+///
+/// Construction rejects origins that are not exact HTTPS origins whose hosts
+/// equal or are subdomains of the RP ID. Validating configuration once prevents
+/// individual ceremony code paths from drifting apart.
 public struct RelyingPartyConfiguration: Equatable, Sendable {
   public let id: String
   public let name: String
@@ -77,6 +82,7 @@ public struct RelyingPartyConfiguration: Equatable, Sendable {
   }
 }
 
+/// A startup-time relying-party configuration error.
 public enum RelyingPartyConfigurationError: Error, Equatable, Sendable {
   case invalidRPID(String)
   case emptyName

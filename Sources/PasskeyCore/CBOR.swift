@@ -1,5 +1,6 @@
 import Foundation
 
+/// A map entry that preserves deterministic CBOR key order.
 public struct CBORMapEntry: Equatable, Sendable {
   public let key: CBORValue
   public let value: CBORValue
@@ -10,6 +11,10 @@ public struct CBORMapEntry: Equatable, Sendable {
   }
 }
 
+/// The bounded CBOR data model needed by WebAuthn and COSE.
+///
+/// Maps use ordered entries instead of a Swift dictionary so duplicate and
+/// non-canonical keys can be rejected before application lookup.
 public indirect enum CBORValue: Equatable, Sendable {
   case unsigned(UInt64)
   case negative(Int64)
@@ -41,6 +46,7 @@ public indirect enum CBORValue: Equatable, Sendable {
   }
 }
 
+/// Allocation and recursion limits applied before decoding untrusted CBOR.
 public struct CBORLimits: Equatable, Sendable {
   public let maximumInputBytes: Int
   public let maximumByteStringBytes: Int
@@ -63,6 +69,7 @@ public struct CBORLimits: Equatable, Sendable {
   }
 }
 
+/// A deterministic-encoding, resource-limit, or structural CBOR failure.
 public enum CBORError: Error, Equatable, Sendable {
   case inputTooLarge(actual: Int, maximum: Int)
   case truncated
@@ -86,6 +93,7 @@ public enum CBORError: Error, Equatable, Sendable {
 /// encoding, rejects duplicate or incorrectly ordered map keys, and applies
 /// conservative resource limits before allocating.
 public enum CBORDecoder {
+  /// Decodes one complete CBOR item and rejects trailing bytes.
   public static func decode(
     _ data: Data,
     limits: CBORLimits = CBORLimits()
@@ -97,6 +105,10 @@ public enum CBORDecoder {
     return result.value
   }
 
+  /// Decodes the first CBOR item and reports its encoded length.
+  ///
+  /// Authenticator data uses this to find the boundary between a COSE public
+  /// key and optional extension data without re-encoding either value.
   public static func decodePrefix(
     _ data: Data,
     limits: CBORLimits = CBORLimits()

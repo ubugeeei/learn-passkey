@@ -2,6 +2,11 @@ import Foundation
 import PasskeyCore
 import PasskeyServer
 
+/// Maps the lab's HTTP routes to domain services and safe public errors.
+///
+/// Cryptographic failures are intentionally collapsed at this boundary. Exact
+/// reasons remain available to tests and internal logs but must not become an
+/// attacker oracle or expose account state to an unauthenticated client.
 public final class PasskeyAPI: Sendable {
   public static let maximumBodyBytes = 64 * 1024
 
@@ -19,6 +24,8 @@ public final class PasskeyAPI: Sendable {
     self.appleApplicationID = appleApplicationID
   }
 
+  /// Handles one complete request with a hard body limit and no shared decoder
+  /// state. Every response includes a request ID and `Cache-Control: no-store`.
   public func handle(_ request: HTTPRequestData) async -> HTTPResponseData {
     do {
       guard request.body.count <= Self.maximumBodyBytes else {

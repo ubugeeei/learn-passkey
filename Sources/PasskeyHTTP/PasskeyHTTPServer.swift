@@ -3,6 +3,12 @@ import NIOCore
 import NIOHTTP1
 import NIOPosix
 
+/// A minimal HTTP/1.1 SwiftNIO adapter for the hands-on RP server.
+///
+/// It bounds request bodies while streaming, copies NIO-owned values before an
+/// async domain call, and closes each connection after one response. Production
+/// TLS termination, proxy trust, timeouts, and distributed limits belong in the
+/// deployment adapter documented by the hardening chapter.
 public struct PasskeyHTTPServer: Sendable {
   private let api: PasskeyAPI
 
@@ -10,6 +16,7 @@ public struct PasskeyHTTPServer: Sendable {
     self.api = api
   }
 
+  /// Binds and blocks until the server channel closes.
   public func run(host: String, port: Int) throws {
     let api = api
     let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
