@@ -369,7 +369,10 @@ struct RegistrationRejection: CustomTestStringConvertible, Sendable {
 
   static let examples = [
     RegistrationRejection(
-      name: "wrong ceremony type", expectedError: .clientData(.unexpectedType("webauthn.get"))
+      name: "wrong ceremony type",
+      expectedError: .clientData(
+        .wrongType(expected: "webauthn.create", actual: "webauthn.get")
+      )
     ) {
       try $0.registrationRequest(options: $1, ceremonyType: "webauthn.get")
     },
@@ -434,7 +437,9 @@ struct AuthenticationRejection: CustomTestStringConvertible, Sendable {
       ceremonyType: "webauthn.create",
       includeUserPresence: true,
       includeUserVerification: true,
-      expectedError: .clientData(.unexpectedType("webauthn.create"))
+      expectedError: .clientData(
+        .wrongType(expected: "webauthn.get", actual: "webauthn.create")
+      )
     ),
     AuthenticationRejection(
       name: "missing user presence",
