@@ -14,10 +14,12 @@ test:
     swift test --parallel
 
 format:
-    swift format --in-place --recursive Package.swift Sources Tests Apps 2>/dev/null || swift format --in-place --recursive Package.swift Sources Tests
+    swift format --configuration .swift-format --in-place --recursive Package.swift Sources Tests Apps
 
 lint:
-    swift format lint --strict --recursive Package.swift Sources Tests Apps 2>/dev/null || swift format lint --strict --recursive Package.swift Sources Tests
+    swift format lint --configuration .swift-format --strict --recursive Package.swift Sources Tests Apps
+
+check: lint build test
 
 server:
     swift run PasskeyServerCLI

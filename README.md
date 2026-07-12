@@ -2,6 +2,10 @@
 
 This repository is a from-zero, implementation-first course on Passkeys and WebAuthn. The client and server are both written in Swift. You will inspect the protocol bytes, implement the relying-party checks, drive Apple's AuthenticationServices API, and finish with the operational decisions needed for a real service.
 
+New to Passkeys? Start with [First Success](docs/00-first-success.md). It explains
+the system without assuming WebAuthn vocabulary, shows what works without an
+iPhone, and diagrams the registration and sign-in paths.
+
 The course intentionally uses very few libraries:
 
 - **SwiftNIO** only for HTTP transport.
@@ -24,11 +28,12 @@ After completing the course, you should be able to:
 
 ## Start here
 
-1. Read the [course roadmap](docs/00-roadmap.md).
-2. Build the [mental model](docs/01-mental-model.md).
-3. Enter the [Nix development environment](docs/02-environment.md).
-4. Follow the hands-on chapters in numeric order.
-5. Use the [production hardening checklist](docs/09-production-hardening.md) before treating any derivative as production-ready.
+1. Get a concrete result with [First Success](docs/00-first-success.md).
+2. Read the [course roadmap](docs/00-roadmap.md).
+3. Build the [mental model](docs/01-mental-model.md).
+4. Enter the [Nix development environment](docs/02-environment.md).
+5. Follow the hands-on chapters in numeric order.
+6. Use the [production hardening checklist](docs/09-production-hardening.md) before treating any derivative as production-ready.
 
 ```sh
 nix develop
@@ -51,7 +56,10 @@ The server starts on `http://127.0.0.1:8080`. A native Passkey ceremony requires
 | `Tests` | Unit, integration, attack, transport, and synthetic-authenticator tests |
 | `docs` | The complete hands-on course, architecture, threat model, and reference material |
 
-The current suite contains 54 tests across protocol primitives, ceremonies, persistence, sessions, HTTP boundaries, and the client transport. Run `just test` whenever a chapter asks you to change an invariant.
+The suite covers protocol primitives, ceremonies, persistence, sessions, HTTP
+boundaries, and the client transport. Run `just test` whenever a chapter asks
+you to change an invariant. CI also rejects unformatted code and malformed
+documentation comments.
 
 ## Important scope boundary
 

@@ -54,16 +54,14 @@ import Testing
     #expect(options.publicKey.attestation == .none)
   }
 
-  @Test(arguments: [
-    (nil, Data("{}".utf8)),
-    ("text/plain", Data("{}".utf8)),
-    ("application/json", Data()),
-    ("application/json", Data("{".utf8)),
-  ])
-  func rejectsInvalidJSONBoundaries(contentType: String?, body: Data) async throws {
+  @Test(
+    "Invalid JSON boundaries are rejected before domain logic runs",
+    arguments: InvalidJSONRequest.examples
+  )
+  func rejectsInvalidJSONBoundaries(example: InvalidJSONRequest) async throws {
     let api = try makeAPI()
     var headers: [String: String] = [:]
-    if let contentType {
+    if let contentType = example.contentType {
       headers["content-type"] = contentType
     }
 
@@ -72,7 +70,7 @@ import Testing
         method: "POST",
         path: "/v1/passkeys/registration/options",
         headers: headers,
-        body: body,
+        body: example.body,
         requestID: "test-request"
       )
     )
@@ -228,4 +226,36 @@ import Testing
 
 private struct Health: Codable {
   let status: String
+}
+
+/// Named input makes the violated HTTP precondition visible in test output.
+private struct InvalidJSONRequest: CustomTestStringConvertible, Sendable {
+  let name: String
+  let contentType: String?
+  let body: Data
+
+  var testDescription: String { name }
+
+  static let examples = [
+    InvalidJSONRequest(
+      name: "missing content type",
+      contentType: nil,
+      body: Data("{}".utf8)
+    ),
+    InvalidJSONRequest(
+      name: "non-JSON content type",
+      contentType: "text/plain",
+      body: Data("{}".utf8)
+    ),
+    InvalidJSONRequest(
+      name: "empty JSON body",
+      contentType: "application/json",
+      body: Data()
+    ),
+    InvalidJSONRequest(
+      name: "malformed JSON body",
+      contentType: "application/json",
+      body: Data("{".utf8)
+    ),
+  ]
 }

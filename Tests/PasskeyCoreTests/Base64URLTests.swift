@@ -4,22 +4,14 @@ import Testing
 @testable import PasskeyCore
 
 @Suite struct Base64URLTests {
-  @Test func rfc4648VectorsWithoutPadding() throws {
-    let vectors = [
-      ("", ""),
-      ("f", "Zg"),
-      ("fo", "Zm8"),
-      ("foo", "Zm9v"),
-      ("foob", "Zm9vYg"),
-      ("fooba", "Zm9vYmE"),
-      ("foobar", "Zm9vYmFy"),
-    ]
-
-    for (plain, encoded) in vectors {
-      let data = Data(plain.utf8)
-      #expect(Base64URL.encode(data) == encoded)
-      #expect(try Base64URL.decode(encoded) == data)
-    }
+  @Test(
+    "RFC 4648 vectors round-trip without padding",
+    arguments: Base64URLVector.rfc4648
+  )
+  func rfc4648VectorsWithoutPadding(vector: Base64URLVector) throws {
+    let data = Data(vector.plainText.utf8)
+    #expect(Base64URL.encode(data) == vector.encoded)
+    #expect(try Base64URL.decode(vector.encoded) == data)
   }
 
   @Test func usesURLSafeAlphabet() throws {
@@ -45,4 +37,22 @@ import Testing
     #expect(!Data([1, 2, 3]).constantTimeEquals(Data([1, 2, 4])))
     #expect(!Data([1, 2, 3]).constantTimeEquals(Data([1, 2, 3, 0])))
   }
+}
+
+/// One standards example shown by name when a parameterized test fails.
+private struct Base64URLVector: CustomTestStringConvertible, Sendable {
+  let plainText: String
+  let encoded: String
+
+  var testDescription: String { "\(plainText.debugDescription) → \(encoded.debugDescription)" }
+
+  static let rfc4648 = [
+    Base64URLVector(plainText: "", encoded: ""),
+    Base64URLVector(plainText: "f", encoded: "Zg"),
+    Base64URLVector(plainText: "fo", encoded: "Zm8"),
+    Base64URLVector(plainText: "foo", encoded: "Zm9v"),
+    Base64URLVector(plainText: "foob", encoded: "Zm9vYg"),
+    Base64URLVector(plainText: "fooba", encoded: "Zm9vYmE"),
+    Base64URLVector(plainText: "foobar", encoded: "Zm9vYmFy"),
+  ]
 }

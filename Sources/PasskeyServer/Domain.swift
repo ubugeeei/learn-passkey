@@ -3,10 +3,15 @@ import PasskeyCore
 
 /// An RP-local account with a stable, opaque WebAuthn user handle.
 public struct UserAccount: Equatable, Sendable {
+  /// Database identity used by the application, not by the authenticator.
   public let id: UUID
+  /// Stable opaque bytes given to WebAuthn as the RP-local user identity.
   public let userHandle: Data
+  /// Human-entered account lookup name.
   public let username: String
+  /// Human-readable label shown by account UI.
   public let displayName: String
+  /// Time at which verified registration committed the account.
   public let createdAt: Date
 
   public init(
@@ -29,16 +34,27 @@ public struct UserAccount: Equatable, Sendable {
 /// This record never contains a Passkey private key or biometric information.
 /// Mutable fields are limited to counter, backup state, and last-use metadata.
 public struct CredentialRecord: Equatable, Sendable {
+  /// Opaque authenticator-generated identifier used to select this credential.
   public let id: Data
+  /// Application account that owns the credential.
   public let userID: UUID
+  /// WebAuthn user handle bound to the owning account.
   public let userHandle: Data
+  /// Parsed ES256 public key used for assertion verification.
   public let publicKey: COSEEC2PublicKey
+  /// Original encoded COSE key retained for inspection and migration.
   public let rawPublicKey: Data
+  /// Authenticator model identifier; all zeroes when not disclosed.
   public let aaguid: Data
+  /// Latest accepted authenticator signature counter.
   public var signCount: UInt32
+  /// Immutable flag indicating whether the credential may be backed up.
   public let backupEligible: Bool
+  /// Latest signed backup state reported by the authenticator.
   public var backupState: Bool
+  /// Time at which verified registration committed the credential.
   public let createdAt: Date
+  /// Time of the latest accepted assertion, if one has occurred.
   public var lastUsedAt: Date?
 
   public init(
