@@ -40,7 +40,7 @@ import Testing
 }
 
 /// One standards example shown by name when a parameterized test fails.
-private struct Base64URLVector: CustomTestStringConvertible, Sendable {
+struct Base64URLVector: CustomTestStringConvertible, Sendable {
   let plainText: String
   let encoded: String
 

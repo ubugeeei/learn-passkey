@@ -229,7 +229,7 @@ private struct Health: Codable {
 }
 
 /// Named input makes the violated HTTP precondition visible in test output.
-private struct InvalidJSONRequest: CustomTestStringConvertible, Sendable {
+struct InvalidJSONRequest: CustomTestStringConvertible, Sendable {
   let name: String
   let contentType: String?
   let body: Data
