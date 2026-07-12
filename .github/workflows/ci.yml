@@ -18,12 +18,12 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Show Swift version
         run: swift --version
       - name: Check formatting and documentation
-        run: just lint
+        run: swift format lint --configuration .swift-format --strict --recursive Package.swift Sources Tests Apps
       - name: Build release artifacts
         run: swift build -c release
       - name: Run tests
-        run: just test
+        run: swift test --parallel
