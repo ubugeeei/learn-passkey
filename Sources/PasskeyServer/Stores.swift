@@ -54,6 +54,8 @@ public protocol PasskeyRepository: Sendable {
   func credential(id: Data) async throws -> CredentialRecord?
   func credentials(userID: UUID) async throws -> [CredentialRecord]
   func create(user: UserAccount, credential: CredentialRecord) async throws
+  func add(credential: CredentialRecord, to userID: UUID) async throws
+  func removeCredential(id: Data, from userID: UUID) async throws
   func updateAfterAuthentication(
     credentialID: Data,
     signCount: UInt32,
@@ -68,6 +70,7 @@ public enum PasskeyRepositoryError: Error, Equatable, Sendable {
   case credentialAlreadyExists
   case credentialNotFound
   case inconsistentAccountBinding
+  case lastCredentialRemovalNotAllowed
 }
 
 /// Process-local account and credential storage used by the lab.
@@ -113,6 +116,29 @@ public actor InMemoryPasskeyRepository: PasskeyRepository {
     usersByID[user.id] = user
     userIDsByUsername[user.username] = user.id
     credentialsByID[credential.id] = credential
+  }
+
+  public func add(credential: CredentialRecord, to userID: UUID) throws {
+    guard let user = usersByID[userID] else {
+      throw PasskeyRepositoryError.credentialNotFound
+    }
+    guard credential.userID == userID, credential.userHandle == user.userHandle else {
+      throw PasskeyRepositoryError.inconsistentAccountBinding
+    }
+    guard credentialsByID[credential.id] == nil else {
+      throw PasskeyRepositoryError.credentialAlreadyExists
+    }
+    credentialsByID[credential.id] = credential
+  }
+
+  public func removeCredential(id: Data, from userID: UUID) throws {
+    guard let credential = credentialsByID[id], credential.userID == userID else {
+      throw PasskeyRepositoryError.credentialNotFound
+    }
+    guard credentialsByID.values.count(where: { $0.userID == userID }) > 1 else {
+      throw PasskeyRepositoryError.lastCredentialRemovalNotAllowed
+    }
+    credentialsByID.removeValue(forKey: id)
   }
 
   public func updateAfterAuthentication(

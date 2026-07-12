@@ -43,6 +43,27 @@ import Testing
     }
   }
 
+  @Test func sensitiveOperationsRequireARecentlyCreatedSession() async throws {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let manager = try SessionManager(
+      store: InMemorySessionStore(),
+      now: { now },
+      randomBytes: { Data(repeating: 0x55, count: $0) }
+    )
+    let issued = try await manager.issue(userID: UUID())
+
+    #expect(
+      try await manager.authenticateRecently(token: issued.token, maximumAge: 300) == issued.userID)
+
+    let oldManager = try SessionManager(
+      store: manager.store,
+      now: { now.addingTimeInterval(301) }
+    )
+    await #expect(throws: SessionManagerError.recentAuthenticationRequired) {
+      try await oldManager.authenticateRecently(token: issued.token, maximumAge: 300)
+    }
+  }
+
   private func makeManager(
     store: InMemorySessionStore = InMemorySessionStore(),
     now: LockedDate? = nil

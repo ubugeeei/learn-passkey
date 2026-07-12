@@ -324,3 +324,35 @@ public struct AuthenticationResultResponse: Codable, Equatable, Sendable {
     self.expiresAt = expiresAt
   }
 }
+
+/// Public, user-visible metadata for one registered Passkey.
+public struct CredentialSummaryResponse: Codable, Equatable, Identifiable, Sendable {
+  public let id: String
+  public let createdAt: Date
+  public let lastUsedAt: Date?
+  public let backupEligible: Bool
+  public let backupState: Bool
+
+  public init(
+    id: String,
+    createdAt: Date,
+    lastUsedAt: Date?,
+    backupEligible: Bool,
+    backupState: Bool
+  ) {
+    self.id = id
+    self.createdAt = createdAt
+    self.lastUsedAt = lastUsedAt
+    self.backupEligible = backupEligible
+    self.backupState = backupState
+  }
+}
+
+/// Collection envelope used by the credential-management screen.
+public struct CredentialListResponse: Codable, Equatable, Sendable {
+  public let credentials: [CredentialSummaryResponse]
+
+  public init(credentials: [CredentialSummaryResponse]) {
+    self.credentials = credentials
+  }
+}

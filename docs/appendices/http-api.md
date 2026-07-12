@@ -90,6 +90,50 @@ Authorization: Bearer <session-token>
 
 Returns 204 and revokes only the presented application session.
 
+## List Passkeys
+
+```http
+GET /v1/passkeys
+Authorization: Bearer <session-token>
+```
+
+Returns credential ID, creation/last-use timestamps, and backup flags for every
+credential owned by the account. Public keys, AAGUIDs, user handles, and
+signature counters are not exposed to the client UI.
+
+## Add another Passkey
+
+These endpoints require a session created within the last five minutes.
+
+```http
+POST /v1/passkeys/addition/options
+Authorization: Bearer <session-token>
+```
+
+Returns registration options for the existing account, including every current
+credential ID in `excludeCredentials`.
+
+```http
+POST /v1/passkeys/addition/complete
+Authorization: Bearer <session-token>
+Content-Type: application/json
+```
+
+Body: `CompleteRegistrationRequest`. The server-held ceremony binds completion
+to the authenticated account. Success is 201 with the new credential summary.
+
+## Remove a Passkey
+
+```http
+DELETE /v1/passkeys/<base64url-credential-id>
+Authorization: Bearer <session-token>
+```
+
+The credential must belong to the account and another credential must remain.
+Success returns 204 and revokes every application session for the account.
+Removing RP public state does not remotely delete the private credential from
+iCloud Keychain.
+
 ## Public errors
 
 ```json
@@ -108,8 +152,11 @@ Common codes:
 | 400 | `invalid_ceremony` | unknown, expired, used, or wrong-purpose ceremony |
 | 400 | `invalid_registration` | registration verification failed |
 | 401 | `unauthorized` | assertion/session/account binding failed |
+| 403 | `recent_authentication_required` | credential change needs a sign-in from the last five minutes |
 | 404 | `not_found` | unknown endpoint |
+| 404 | `credential_not_found` | owned credential was not found |
 | 409 | `username_unavailable` | username cannot be used |
+| 409 | `last_credential` | removal would delete the last sign-in method |
 | 413 | `body_too_large` | body exceeded 64 KiB |
 | 500 | `internal_error` | unhandled server/storage failure |
 

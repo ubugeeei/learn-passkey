@@ -14,17 +14,19 @@ final class PasskeyViewModel {
     case signedOut
     case registering
     case authenticating
+    case managingCredentials
     case signedIn(UserSummaryResponse)
     case failed(String)
 
     var isBusy: Bool {
-      self == .registering || self == .authenticating
+      self == .registering || self == .authenticating || self == .managingCredentials
     }
   }
 
   var username = "alice@example.com"
   var displayName = "Alice"
   private(set) var phase: Phase = .signedOut
+  private(set) var credentials: [CredentialSummaryResponse] = []
 
   private let api: PasskeyAPIClient
   private let authorization: PasskeyAuthorizationService
@@ -69,6 +71,36 @@ final class PasskeyViewModel {
       let result = try await api.completeAuthentication(assertion)
       sessionToken = result.sessionToken
       phase = .signedIn(result.user)
+      try await refreshCredentials()
+    } catch {
+      phase = .failed(message(for: error))
+    }
+  }
+
+  /// Creates another Passkey for the signed-in account.
+  func addCredential() async {
+    guard let sessionToken, case .signedIn(let user) = phase else { return }
+    phase = .managingCredentials
+    do {
+      let options = try await api.beginCredentialAddition(sessionToken: sessionToken)
+      let credential = try await authorization.register(options: options)
+      _ = try await api.completeCredentialAddition(credential, sessionToken: sessionToken)
+      phase = .signedIn(user)
+      try await refreshCredentials()
+    } catch {
+      phase = .failed(message(for: error))
+    }
+  }
+
+  /// Removes a Passkey; the server revokes every session after the change.
+  func removeCredential(id: String) async {
+    guard let sessionToken else { return }
+    phase = .managingCredentials
+    do {
+      try await api.removeCredential(id: id, sessionToken: sessionToken)
+      self.sessionToken = nil
+      credentials = []
+      phase = .signedOut
     } catch {
       phase = .failed(message(for: error))
     }
@@ -84,10 +116,16 @@ final class PasskeyViewModel {
     do {
       try await api.logout(sessionToken: sessionToken)
       self.sessionToken = nil
+      credentials = []
       phase = .signedOut
     } catch {
       phase = .failed(message(for: error))
     }
+  }
+
+  private func refreshCredentials() async throws {
+    guard let sessionToken else { return }
+    credentials = try await api.credentials(sessionToken: sessionToken).credentials
   }
 
   private func message(for error: Error) -> String {

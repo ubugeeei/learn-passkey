@@ -101,6 +101,11 @@ Users need:
 
 Do not use the first-account registration endpoint to add a credential to an existing account.
 
+The lab demonstrates addition, inventory, safe removal, five-minute recent
+authentication, and all-session revocation after removal. Production still
+needs user-defined labels, notifications, audit events, concurrent update
+policy, and a recovery decision before the last credential may disappear.
+
 ## 7. Recovery defines effective security
 
 Model at least:

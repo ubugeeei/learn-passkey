@@ -146,6 +146,18 @@ They verify:
 
 The OS ceremony requires an integration test on simulator/device with the associated domain. Do not claim the client is integration-tested when only transport unit tests ran.
 
+## 9. Manage Passkeys after sign-in
+
+The sample app loads the authenticated account's credential inventory after
+sign-in. **Add another Passkey** starts another OS registration sheet, but its
+server-side ceremony is bound to the existing account and requires a session
+created within five minutes.
+
+Swipe-to-remove is disabled for the last credential. Successful removal revokes
+every application session and returns the app to signed-out state. It removes
+the RP's public record, not the private credential in iCloud Keychain; platform
+credential cleanup remains a separate device action.
+
 ## Exercises
 
 1. Set a breakpoint in the authorization delegate and inspect the available fields. Confirm no private key or biometric data exists.

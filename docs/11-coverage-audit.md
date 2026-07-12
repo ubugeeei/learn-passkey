@@ -108,7 +108,7 @@ partially implemented features:
 
 | Capability not implemented | Why it is outside the current lab | Required next boundary |
 | --- | --- | --- |
-| Add, label, list, and remove multiple Passkeys | Requires authenticated recent step-up and product UX | credential-management service/API/UI plus audit events |
+| User-defined Passkey labels and rename | Addition, inventory, safe removal, recent-auth enforcement, and session revocation are implemented | label validation, persistence migration, rename API and audit events |
 | Account recovery | Product-specific identity and risk decision | recovery policy, cooling-off, notifications, incident tests |
 | Multi-node database/cache topology | SQLite adapter is single-node | shared transactional store and multi-instance tests |
 | Distributed rate limiting | Requires deployment-wide identity/network policy | shared limiter with explicit outage behavior |
@@ -132,3 +132,19 @@ tests. The repository is comprehensive as an implementation-first reference for
 that scope. It is deliberately not a comprehensive authentication product; the
 table above is the authoritative gap list, and `09-production-hardening.md`
 defines the acceptance gate before expanding that claim.
+
+## Credential lifecycle coverage
+
+```mermaid
+stateDiagram-v2
+    [*] --> OneCredential: first registration
+    OneCredential --> MultipleCredentials: recent session + verified addition
+    MultipleCredentials --> MultipleCredentials: add or remove
+    MultipleCredentials --> OneCredential: remove + revoke all sessions
+    OneCredential --> OneCredential: last removal rejected
+```
+
+The addition ceremony is account-bound in server state, current IDs are sent as
+exclusions, SQLite changes are transactional, foreign IDs are rejected, and a
+successful removal revokes every application session. Server, persistence,
+HTTP, and typed-client tests cover these boundaries.

@@ -34,6 +34,29 @@ struct ContentView: View {
             Task { await model.signOut() }
           }
         }
+
+        if case .signedIn = model.phase {
+          Section("Your Passkeys") {
+            ForEach(model.credentials) { credential in
+              VStack(alignment: .leading) {
+                Text(String(credential.id.prefix(12)) + "…")
+                  .font(.system(.body, design: .monospaced))
+                Text(credential.lastUsedAt == nil ? "Not used yet" : "Previously used")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              .swipeActions {
+                Button("Remove", role: .destructive) {
+                  Task { await model.removeCredential(id: credential.id) }
+                }
+                .disabled(model.credentials.count == 1)
+              }
+            }
+            Button("Add another Passkey") {
+              Task { await model.addCredential() }
+            }
+          }
+        }
       }
       .navigationTitle("Passkey Lab")
       .overlay {
@@ -55,6 +78,8 @@ struct ContentView: View {
       Text("Creating credential…")
     case .authenticating:
       Text("Verifying assertion…")
+    case .managingCredentials:
+      Text("Updating Passkeys…")
     case .signedIn(let user):
       LabeledContent("Signed in", value: user.displayName)
     case .failed(let message):

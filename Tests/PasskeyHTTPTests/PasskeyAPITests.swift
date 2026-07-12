@@ -147,6 +147,56 @@ import Testing
     #expect(try errorCode(unknown) == "not_found")
   }
 
+  @Test func listsOwnedCredentialsAndRevokesAllSessionsAfterRemoval() async throws {
+    let repository = InMemoryPasskeyRepository()
+    let sessions = try SessionManager(store: InMemorySessionStore())
+    let api = try makeAPI(repository: repository, sessions: sessions)
+    let user = makeUser()
+    let first = try makeCredential(user: user, idByte: 0x22)
+    let second = try makeCredential(user: user, idByte: 0x33)
+    try await repository.create(user: user, credential: first)
+    try await repository.add(credential: second, to: user.id)
+    let session = try await sessions.issue(userID: user.id)
+    let headers = ["authorization": "Bearer \(session.token)"]
+
+    let list = await api.handle(request(method: "GET", path: "/v1/passkeys", headers: headers))
+    let response = try JSONDecoder().decode(CredentialListResponse.self, from: list.body)
+    #expect(
+      response.credentials.map(\.id) == [Base64URL.encode(first.id), Base64URL.encode(second.id)])
+
+    let removal = await api.handle(
+      request(
+        method: "DELETE",
+        path: "/v1/passkeys/\(Base64URL.encode(first.id))",
+        headers: headers
+      )
+    )
+    let afterRemoval = await api.handle(request(method: "GET", path: "/v1/me", headers: headers))
+    #expect(removal.status == 204)
+    #expect(afterRemoval.status == 401)
+  }
+
+  @Test func refusesToRemoveTheLastCredential() async throws {
+    let repository = InMemoryPasskeyRepository()
+    let sessions = try SessionManager(store: InMemorySessionStore())
+    let api = try makeAPI(repository: repository, sessions: sessions)
+    let user = makeUser()
+    let credential = try makeCredential(user: user)
+    try await repository.create(user: user, credential: credential)
+    let session = try await sessions.issue(userID: user.id)
+
+    let response = await api.handle(
+      request(
+        method: "DELETE",
+        path: "/v1/passkeys/\(Base64URL.encode(credential.id))",
+        headers: ["authorization": "Bearer \(session.token)"]
+      )
+    )
+
+    #expect(response.status == 409)
+    #expect(try errorCode(response) == "last_credential")
+  }
+
   private func makeAPI(
     repository: InMemoryPasskeyRepository = InMemoryPasskeyRepository(),
     sessions: SessionManager? = nil
@@ -203,9 +253,9 @@ import Testing
     )
   }
 
-  private func makeCredential(user: UserAccount) throws -> CredentialRecord {
+  private func makeCredential(user: UserAccount, idByte: UInt8 = 0x22) throws -> CredentialRecord {
     CredentialRecord(
-      id: Data(repeating: 0x22, count: 32),
+      id: Data(repeating: idByte, count: 32),
       userID: user.id,
       userHandle: user.userHandle,
       publicKey: try COSEEC2PublicKey(

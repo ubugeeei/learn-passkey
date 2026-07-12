@@ -122,7 +122,7 @@ public final class PasskeyService: Sendable {
     )
   }
 
-  private func makeCeremony(purpose: CeremonyPurpose, issuedAt: Date) throws -> CeremonyState {
+  func makeCeremony(purpose: CeremonyPurpose, issuedAt: Date) throws -> CeremonyState {
     CeremonyState(
       id: Base64URL.encode(try randomBytes(24)),
       challenge: try randomBytes(32),

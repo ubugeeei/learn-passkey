@@ -104,6 +104,51 @@ public struct PasskeyAPIClient: Sendable {
     )
   }
 
+  /// Returns public metadata for every Passkey registered to the account.
+  public func credentials(sessionToken: String) async throws -> CredentialListResponse {
+    try await send(
+      path: "/v1/passkeys",
+      method: "GET",
+      body: Optional<BeginAuthenticationRequest>.none,
+      sessionToken: sessionToken
+    )
+  }
+
+  /// Starts a recent-authentication-protected additional-Passkey ceremony.
+  public func beginCredentialAddition(
+    sessionToken: String
+  ) async throws -> RegistrationOptionsResponse {
+    try await send(
+      path: "/v1/passkeys/addition/options",
+      method: "POST",
+      body: Optional<BeginAuthenticationRequest>.none,
+      sessionToken: sessionToken
+    )
+  }
+
+  /// Stores an additional Passkey after server verification.
+  public func completeCredentialAddition(
+    _ request: CompleteRegistrationRequest,
+    sessionToken: String
+  ) async throws -> CredentialSummaryResponse {
+    try await send(
+      path: "/v1/passkeys/addition/complete",
+      method: "POST",
+      body: request,
+      sessionToken: sessionToken
+    )
+  }
+
+  /// Removes one Passkey and invalidates all application sessions.
+  public func removeCredential(id: String, sessionToken: String) async throws {
+    _ = try await perform(
+      path: "/v1/passkeys/\(id)",
+      method: "DELETE",
+      body: Optional<BeginAuthenticationRequest>.none,
+      sessionToken: sessionToken
+    )
+  }
+
   /// Revokes the presented application session. This does not delete the
   /// Passkey from the authenticator or the public key from the RP.
   public func logout(sessionToken: String) async throws {

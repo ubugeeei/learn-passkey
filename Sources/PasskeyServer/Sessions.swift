@@ -126,6 +126,22 @@ public final class SessionManager: Sendable {
 
   /// Resolves an unexpired bearer to its account without extending expiry.
   public func authenticate(token: String) async throws -> UUID {
+    try await session(token: token).userID
+  }
+
+  /// Requires a session created within `maximumAge` for sensitive operations.
+  public func authenticateRecently(token: String, maximumAge: TimeInterval) async throws -> UUID {
+    guard maximumAge > 0 else {
+      throw SessionManagerError.recentAuthenticationRequired
+    }
+    let record = try await session(token: token)
+    guard now().timeIntervalSince(record.createdAt) <= maximumAge else {
+      throw SessionManagerError.recentAuthenticationRequired
+    }
+    return record.userID
+  }
+
+  private func session(token: String) async throws -> SessionRecord {
     let rawToken: Data
     do {
       rawToken = try Base64URL.decode(token)
@@ -140,7 +156,7 @@ public final class SessionManager: Sendable {
     else {
       throw SessionManagerError.invalidSession
     }
-    return session.userID
+    return session
   }
 
   /// Revokes one presented bearer. Revocation is idempotent for a valid shape.
@@ -167,4 +183,5 @@ public final class SessionManager: Sendable {
 public enum SessionManagerError: Error, Equatable, Sendable {
   case invalidTimeToLive
   case invalidSession
+  case recentAuthenticationRequired
 }

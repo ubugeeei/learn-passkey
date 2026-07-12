@@ -104,6 +104,40 @@ import Testing
     try await client.logout(sessionToken: "session")
   }
 
+  @Test func credentialManagementUsesProtectedTypedRoutes() async throws {
+    let summary = CredentialSummaryResponse(
+      id: "AQ",
+      createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+      lastUsedAt: nil,
+      backupEligible: true,
+      backupState: true
+    )
+    let client = try makeClient { request in
+      #expect(request.url?.path == "/v1/passkeys")
+      #expect(request.httpMethod == "GET")
+      #expect(request.value(forHTTPHeaderField: "authorization") == "Bearer session")
+      let encoder = JSONEncoder()
+      encoder.dateEncodingStrategy = .iso8601
+      return try response(
+        status: 200,
+        body: encoder.encode(CredentialListResponse(credentials: [summary]))
+      )
+    }
+
+    #expect(try await client.credentials(sessionToken: "session").credentials == [summary])
+  }
+
+  @Test func credentialRemovalUsesEncodedIdentifierAndBearer() async throws {
+    let client = try makeClient { request in
+      #expect(request.url?.path == "/v1/passkeys/AQ")
+      #expect(request.httpMethod == "DELETE")
+      #expect(request.value(forHTTPHeaderField: "authorization") == "Bearer session")
+      return try response(status: 204, body: Data())
+    }
+
+    try await client.removeCredential(id: "AQ", sessionToken: "session")
+  }
+
   private func makeClient(
     transport: @escaping PasskeyAPIClient.Transport
   ) throws -> PasskeyAPIClient {

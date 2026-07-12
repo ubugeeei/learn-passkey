@@ -297,6 +297,49 @@ import Testing
     }
   }
 
+  @Test func addsListsAndSafelyRemovesAdditionalCredential() async throws {
+    let service = try makeService()
+    let firstAuthenticator = TestAuthenticator(credentialID: Data(repeating: 0x11, count: 32))
+    let secondAuthenticator = TestAuthenticator(credentialID: Data(repeating: 0x22, count: 32))
+    let registration = try await register(firstAuthenticator, with: service)
+
+    let options = try await service.beginCredentialAddition(userID: registration.user.id)
+    #expect(options.publicKey.user.id == Base64URL.encode(registration.user.userHandle))
+    #expect(
+      options.publicKey.excludeCredentials.map(\.id) == [
+        Base64URL.encode(firstAuthenticator.credentialID)
+      ])
+
+    let added = try await service.completeCredentialAddition(
+      secondAuthenticator.registrationRequest(options: options),
+      userID: registration.user.id
+    )
+    #expect(added.id == secondAuthenticator.credentialID)
+    #expect(try await service.credentials(userID: registration.user.id).count == 2)
+
+    try await service.removeCredential(
+      id: firstAuthenticator.credentialID, userID: registration.user.id)
+    #expect(try await service.credentials(userID: registration.user.id).map(\.id) == [added.id])
+    await #expect(throws: PasskeyRepositoryError.lastCredentialRemovalNotAllowed) {
+      try await service.removeCredential(id: added.id, userID: registration.user.id)
+    }
+  }
+
+  @Test func credentialAdditionCannotCrossAccountBoundary() async throws {
+    let service = try makeService()
+    let authenticator = TestAuthenticator()
+    let registration = try await register(authenticator, with: service)
+    let options = try await service.beginCredentialAddition(userID: registration.user.id)
+
+    await #expect(throws: PasskeyServiceError.userMismatch) {
+      try await service.completeCredentialAddition(
+        TestAuthenticator(credentialID: Data(repeating: 0x44, count: 32))
+          .registrationRequest(options: options),
+        userID: UUID()
+      )
+    }
+  }
+
   @Test func rejectsAValidSignatureWhenCounterDoesNotAdvance() async throws {
     let service = try makeService()
     let authenticator = TestAuthenticator()

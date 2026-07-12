@@ -116,31 +116,46 @@ public actor SQLitePasskeyRepository: PasskeyRepository {
           .double(user.createdAt.timeIntervalSince1970),
         ]
       )
-      try database.execute(
-        """
-        INSERT INTO passkey_credentials (
-          id, user_id, user_handle, raw_public_key, aaguid,
-          algorithm, curve, x, y, sign_count,
-          backup_eligible, backup_state, created_at, last_used_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        bindings: [
-          .blob(credential.id),
-          .text(credential.userID.uuidString),
-          .blob(credential.userHandle),
-          .blob(credential.rawPublicKey),
-          .blob(credential.aaguid),
-          .integer(credential.publicKey.algorithm),
-          .integer(credential.publicKey.curve),
-          .blob(credential.publicKey.x),
-          .blob(credential.publicKey.y),
-          .integer(Int64(credential.signCount)),
-          .integer(credential.backupEligible ? 1 : 0),
-          .integer(credential.backupState ? 1 : 0),
-          .double(credential.createdAt.timeIntervalSince1970),
-          credential.lastUsedAt.map { .double($0.timeIntervalSince1970) } ?? .null,
-        ]
+      try insert(credential)
+    }
+  }
+
+  public func add(credential: CredentialRecord, to userID: UUID) throws {
+    try database.transaction {
+      guard let user = try user(id: userID) else {
+        throw PasskeyRepositoryError.credentialNotFound
+      }
+      guard credential.userID == userID, credential.userHandle == user.userHandle else {
+        throw PasskeyRepositoryError.inconsistentAccountBinding
+      }
+      guard
+        try findCredential(
+          sql: Self.credentialSelect + " WHERE id = ?",
+          bindings: [.blob(credential.id)]
+        ) == nil
+      else {
+        throw PasskeyRepositoryError.credentialAlreadyExists
+      }
+      try insert(credential)
+    }
+  }
+
+  public func removeCredential(id: Data, from userID: UUID) throws {
+    try database.transaction {
+      let rows = try database.rows(
+        "SELECT COUNT(*) FROM passkey_credentials WHERE user_id = ?",
+        bindings: [.text(userID.uuidString)]
       )
+      guard try rows.first?.integer(0) ?? 0 > 1 else {
+        throw PasskeyRepositoryError.lastCredentialRemovalNotAllowed
+      }
+      let changes = try database.execute(
+        "DELETE FROM passkey_credentials WHERE id = ? AND user_id = ?",
+        bindings: [.blob(id), .text(userID.uuidString)]
+      )
+      guard changes == 1 else {
+        throw PasskeyRepositoryError.credentialNotFound
+      }
     }
   }
 
@@ -177,6 +192,34 @@ public actor SQLitePasskeyRepository: PasskeyRepository {
       throw SQLitePersistenceError.corrupted("User uniqueness constraint was violated")
     }
     return try rows.first.map(Self.user(from:))
+  }
+
+  private func insert(_ credential: CredentialRecord) throws {
+    try database.execute(
+      """
+      INSERT INTO passkey_credentials (
+        id, user_id, user_handle, raw_public_key, aaguid,
+        algorithm, curve, x, y, sign_count,
+        backup_eligible, backup_state, created_at, last_used_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      """,
+      bindings: [
+        .blob(credential.id),
+        .text(credential.userID.uuidString),
+        .blob(credential.userHandle),
+        .blob(credential.rawPublicKey),
+        .blob(credential.aaguid),
+        .integer(credential.publicKey.algorithm),
+        .integer(credential.publicKey.curve),
+        .blob(credential.publicKey.x),
+        .blob(credential.publicKey.y),
+        .integer(Int64(credential.signCount)),
+        .integer(credential.backupEligible ? 1 : 0),
+        .integer(credential.backupState ? 1 : 0),
+        .double(credential.createdAt.timeIntervalSince1970),
+        credential.lastUsedAt.map { .double($0.timeIntervalSince1970) } ?? .null,
+      ]
+    )
   }
 
   private func findCredential(

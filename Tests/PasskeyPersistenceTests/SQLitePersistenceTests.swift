@@ -131,6 +131,82 @@ import Testing
     }
   }
 
+  @Test func additionalCredentialsAreAtomicAndLastCredentialIsProtected() async throws {
+    let database = TemporaryDatabase()
+    let repository = try SQLitePasskeyRepository(path: database.path)
+    let user = makeUser()
+    let first = try makeCredential(user: user)
+    let second = try makeCredential(user: user, idByte: 0x33)
+    try await repository.create(user: user, credential: first)
+    try await repository.add(credential: second, to: user.id)
+
+    try await repository.removeCredential(id: first.id, from: user.id)
+    #expect(try await repository.credentials(userID: user.id).map(\.id) == [second.id])
+    await #expect(throws: PasskeyRepositoryError.lastCredentialRemovalNotAllowed) {
+      try await repository.removeCredential(id: second.id, from: user.id)
+    }
+
+    let reopened = try SQLitePasskeyRepository(path: database.path)
+    #expect(try await reopened.credentials(userID: user.id).map(\.id) == [second.id])
+  }
+
+  @Test func credentialAdditionCeremonySurvivesReopening() async throws {
+    let database = TemporaryDatabase()
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let state = CeremonyState(
+      id: "credential-addition",
+      challenge: Data(repeating: 0xaa, count: 32),
+      purpose: .credentialAddition(expectedUserID: makeUser().id),
+      expiresAt: now.addingTimeInterval(60)
+    )
+    try await SQLiteCeremonyStore(path: database.path).save(state)
+
+    #expect(
+      try await SQLiteCeremonyStore(path: database.path).consume(id: state.id, at: now) == state)
+  }
+
+  @Test func legacyCeremonySchemaMigratesWithoutLosingPendingState() async throws {
+    let database = TemporaryDatabase()
+    let connection = try SQLiteDatabase(path: database.path)
+    try connection.execute(
+      """
+      CREATE TABLE passkey_ceremonies (
+        id TEXT PRIMARY KEY NOT NULL, challenge BLOB NOT NULL,
+        purpose INTEGER NOT NULL CHECK (purpose IN (1, 2)),
+        user_id TEXT, user_handle BLOB, username TEXT, display_name TEXT,
+        user_created_at REAL, expected_user_id TEXT, require_user_handle INTEGER,
+        expires_at REAL NOT NULL
+      )
+      """
+    )
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    try connection.execute(
+      """
+      INSERT INTO passkey_ceremonies
+      (id, challenge, purpose, expected_user_id, require_user_handle, expires_at)
+      VALUES (?, ?, 2, NULL, 1, ?)
+      """,
+      bindings: [
+        .text("legacy"),
+        .blob(Data(repeating: 0x01, count: 32)),
+        .double(now.addingTimeInterval(60).timeIntervalSince1970),
+      ]
+    )
+
+    let migrated = try SQLiteCeremonyStore(path: database.path)
+    let legacy = try await migrated.consume(id: "legacy", at: now)
+    #expect(legacy.purpose == .authentication(expectedUserID: nil, requireUserHandle: true))
+
+    let addition = CeremonyState(
+      id: "new-purpose",
+      challenge: Data(repeating: 0x02, count: 32),
+      purpose: .credentialAddition(expectedUserID: makeUser().id),
+      expiresAt: now.addingTimeInterval(60)
+    )
+    try await migrated.save(addition)
+    #expect(try await migrated.consume(id: addition.id, at: now) == addition)
+  }
+
   private func makeUser() -> UserAccount {
     UserAccount(
       id: UUID(uuidString: "EB1E1AE6-D948-4BE4-9CC9-F379487FF2BB")!,

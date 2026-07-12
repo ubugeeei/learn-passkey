@@ -97,6 +97,7 @@ public struct PendingRegistration: Equatable, Sendable {
 public enum CeremonyPurpose: Equatable, Sendable {
   case registration(PendingRegistration)
   case authentication(expectedUserID: UUID?, requireUserHandle: Bool)
+  case credentialAddition(expectedUserID: UUID)
 }
 
 /// Single-use server state that binds a challenge to purpose and expiry.

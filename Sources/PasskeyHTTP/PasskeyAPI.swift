@@ -103,6 +103,33 @@ public final class PasskeyAPI: Sendable {
           requestID: request.requestID
         )
 
+      case ("GET", "/v1/passkeys"):
+        let userID = try await authenticatedUserID(request)
+        let credentials = try await passkeys.credentials(userID: userID)
+        return try json(
+          status: 200,
+          CredentialListResponse(credentials: credentials.map(credentialResponse)),
+          requestID: request.requestID
+        )
+
+      case ("POST", "/v1/passkeys/addition/options"):
+        let userID = try await recentlyAuthenticatedUserID(request)
+        return try json(
+          status: 200,
+          await passkeys.beginCredentialAddition(userID: userID),
+          requestID: request.requestID
+        )
+
+      case ("POST", "/v1/passkeys/addition/complete"):
+        let userID = try await recentlyAuthenticatedUserID(request)
+        let body: CompleteRegistrationRequest = try decodeJSON(request)
+        let credential = try await passkeys.completeCredentialAddition(body, userID: userID)
+        return try json(
+          status: 201,
+          credentialResponse(credential),
+          requestID: request.requestID
+        )
+
       case ("POST", "/v1/session/logout"):
         let token = try bearerToken(request)
         _ = try await sessions.authenticate(token: token)
@@ -113,6 +140,23 @@ public final class PasskeyAPI: Sendable {
         )
 
       default:
+        if request.method == "DELETE",
+          let encodedID = credentialIDPathComponent(request.path)
+        {
+          let userID = try await recentlyAuthenticatedUserID(request)
+          let credentialID: Data
+          do {
+            credentialID = try Base64URL.decode(encodedID)
+          } catch {
+            throw APIInputError.invalidCredentialID
+          }
+          try await passkeys.removeCredential(id: credentialID, userID: userID)
+          try await sessions.revokeAll(userID: userID)
+          return HTTPResponseData(
+            status: 204,
+            headers: responseHeaders(requestID: request.requestID)
+          )
+        }
         return error(
           status: 404,
           code: "not_found",
@@ -126,11 +170,30 @@ public final class PasskeyAPI: Sendable {
   }
 
   private func authenticatedUser(_ request: HTTPRequestData) async throws -> UserAccount {
-    let userID = try await sessions.authenticate(token: bearerToken(request))
+    let userID = try await authenticatedUserID(request)
     guard let user = try await passkeys.repository.user(id: userID) else {
       throw SessionManagerError.invalidSession
     }
     return user
+  }
+
+  private func authenticatedUserID(_ request: HTTPRequestData) async throws -> UUID {
+    try await sessions.authenticate(token: bearerToken(request))
+  }
+
+  private func recentlyAuthenticatedUserID(_ request: HTTPRequestData) async throws -> UUID {
+    try await sessions.authenticateRecently(
+      token: bearerToken(request),
+      maximumAge: 5 * 60
+    )
+  }
+
+  private func credentialIDPathComponent(_ path: String) -> String? {
+    let prefix = "/v1/passkeys/"
+    guard path.hasPrefix(prefix) else { return nil }
+    let component = String(path.dropFirst(prefix.count))
+    guard !component.isEmpty, !component.contains("/") else { return nil }
+    return component
   }
 
   private func bearerToken(_ request: HTTPRequestData) throws -> String {
@@ -202,6 +265,27 @@ public final class PasskeyAPI: Sendable {
         message: "The request is invalid.",
         requestID: requestID
       )
+    case SessionManagerError.recentAuthenticationRequired:
+      return error(
+        status: 403,
+        code: "recent_authentication_required",
+        message: "Sign in again before changing Passkeys.",
+        requestID: requestID
+      )
+    case PasskeyRepositoryError.lastCredentialRemovalNotAllowed:
+      return error(
+        status: 409,
+        code: "last_credential",
+        message: "The last Passkey cannot be removed.",
+        requestID: requestID
+      )
+    case PasskeyRepositoryError.credentialNotFound:
+      return error(
+        status: 404,
+        code: "credential_not_found",
+        message: "The Passkey does not exist.",
+        requestID: requestID
+      )
     case is CeremonyStoreError:
       return error(
         status: 400,
@@ -253,11 +337,22 @@ public final class PasskeyAPI: Sendable {
       displayName: user.displayName
     )
   }
+
+  private func credentialResponse(_ credential: CredentialRecord) -> CredentialSummaryResponse {
+    CredentialSummaryResponse(
+      id: Base64URL.encode(credential.id),
+      createdAt: credential.createdAt,
+      lastUsedAt: credential.lastUsedAt,
+      backupEligible: credential.backupEligible,
+      backupState: credential.backupState
+    )
+  }
 }
 
 private enum APIInputError: Error {
   case unsupportedContentType
   case emptyBody
+  case invalidCredentialID
 }
 
 private struct HealthResponse: Codable {

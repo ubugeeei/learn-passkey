@@ -16,7 +16,7 @@ public actor SQLiteCeremonyStore: CeremonyStore {
       CREATE TABLE IF NOT EXISTS passkey_ceremonies (
         id TEXT PRIMARY KEY NOT NULL,
         challenge BLOB NOT NULL,
-        purpose INTEGER NOT NULL CHECK (purpose IN (1, 2)),
+        purpose INTEGER NOT NULL CHECK (purpose IN (1, 2, 3)),
         user_id TEXT,
         user_handle BLOB,
         username TEXT,
@@ -28,6 +28,38 @@ public actor SQLiteCeremonyStore: CeremonyStore {
       )
       """
     )
+    let schema = try database.rows(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'passkey_ceremonies'"
+    ).first?.text(0)
+    if schema?.contains("1, 2, 3") != true {
+      try database.transaction {
+        try database.execute("ALTER TABLE passkey_ceremonies RENAME TO passkey_ceremonies_v1")
+        try database.execute(
+          """
+          CREATE TABLE passkey_ceremonies (
+            id TEXT PRIMARY KEY NOT NULL,
+            challenge BLOB NOT NULL,
+            purpose INTEGER NOT NULL CHECK (purpose IN (1, 2, 3)),
+            user_id TEXT,
+            user_handle BLOB,
+            username TEXT,
+            display_name TEXT,
+            user_created_at REAL,
+            expected_user_id TEXT,
+            require_user_handle INTEGER,
+            expires_at REAL NOT NULL
+          )
+          """
+        )
+        try database.execute(
+          """
+          INSERT INTO passkey_ceremonies
+          SELECT * FROM passkey_ceremonies_v1
+          """
+        )
+        try database.execute("DROP TABLE passkey_ceremonies_v1")
+      }
+    }
     try database.execute(
       "CREATE INDEX IF NOT EXISTS passkey_ceremonies_expires_at ON passkey_ceremonies(expires_at)"
     )
@@ -139,6 +171,11 @@ public actor SQLiteCeremonyStore: CeremonyStore {
         expectedUserID: expectedUserID,
         requireUserHandle: required == 1
       )
+    case 3:
+      guard let value = try row.optionalText(8), let userID = UUID(uuidString: value) else {
+        throw SQLitePersistenceError.corrupted("Invalid credential-addition user UUID")
+      }
+      purpose = .credentialAddition(expectedUserID: userID)
     default:
       throw SQLitePersistenceError.corrupted("Unknown ceremony purpose")
     }
@@ -174,6 +211,17 @@ public actor SQLiteCeremonyStore: CeremonyStore {
         userCreatedAt: nil,
         expectedUserID: expectedUserID?.uuidString,
         requireUserHandle: requireUserHandle
+      )
+    case .credentialAddition(let expectedUserID):
+      EncodedPurpose(
+        kind: 3,
+        userID: nil,
+        userHandle: nil,
+        username: nil,
+        displayName: nil,
+        userCreatedAt: nil,
+        expectedUserID: expectedUserID.uuidString,
+        requireUserHandle: nil
       )
     }
   }
