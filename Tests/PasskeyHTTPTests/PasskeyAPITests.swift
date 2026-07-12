@@ -160,7 +160,9 @@ import Testing
     let headers = ["authorization": "Bearer \(session.token)"]
 
     let list = await api.handle(request(method: "GET", path: "/v1/passkeys", headers: headers))
-    let response = try JSONDecoder().decode(CredentialListResponse.self, from: list.body)
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let response = try decoder.decode(CredentialListResponse.self, from: list.body)
     #expect(
       response.credentials.map(\.id) == [Base64URL.encode(first.id), Base64URL.encode(second.id)])
 
