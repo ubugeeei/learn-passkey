@@ -27,7 +27,7 @@ struct TestAuthenticator {
     embeddedCredentialID: Data? = nil,
     publicKeyX963: Data? = nil,
     attestationFormat: String = "none",
-    attestationStatement: [(TestCBOREncoder.Value, TestCBOREncoder.Value)] = []
+    includeAttestationStatement: Bool = false
   ) throws -> CompleteRegistrationRequest {
     let clientDataJSON = try makeClientDataJSON(
       type: ceremonyType,
@@ -45,7 +45,10 @@ struct TestAuthenticator {
     let attestationObject = TestCBOREncoder.map([
       (.text("fmt"), .text(attestationFormat)),
       (.text("authData"), .bytes(authData)),
-      (.text("attStmt"), .map(attestationStatement)),
+      (
+        .text("attStmt"),
+        .map(includeAttestationStatement ? [(.text("unexpected"), .unsigned(1))] : [])
+      ),
     ])
     let credentialID = Base64URL.encode(credentialID)
     return CompleteRegistrationRequest(
@@ -197,8 +200,8 @@ extension UInt32 {
   }
 }
 
-enum TestCBOREncoder {
-  indirect enum Value {
+private enum TestCBOREncoder {
+  enum Value {
     case unsigned(UInt64)
     case negative(Int64)
     case bytes(Data)

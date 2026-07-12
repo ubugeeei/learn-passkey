@@ -394,7 +394,7 @@ struct RegistrationRejection: CustomTestStringConvertible, Sendable {
     ) {
       try $0.registrationRequest(
         options: $1,
-        attestationStatement: [(.text("unexpected"), .unsigned(1))]
+        includeAttestationStatement: true
       )
     },
   ]
