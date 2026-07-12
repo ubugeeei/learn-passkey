@@ -198,7 +198,7 @@ extension UInt32 {
 }
 
 enum TestCBOREncoder {
-  enum Value {
+  indirect enum Value {
     case unsigned(UInt64)
     case negative(Int64)
     case bytes(Data)
