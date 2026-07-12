@@ -20,23 +20,32 @@ struct TestAuthenticator {
     options: RegistrationOptionsResponse,
     origin: String = "https://passkeys.example.com",
     rpID: String = "passkeys.example.com",
+    ceremonyType: String = "webauthn.create",
+    includeUserPresence: Bool = true,
     includeUserVerification: Bool = true,
-    publicKeyX963: Data? = nil
+    backupEligible: Bool = false,
+    embeddedCredentialID: Data? = nil,
+    publicKeyX963: Data? = nil,
+    attestationFormat: String = "none",
+    attestationStatement: [(TestCBOREncoder.Value, TestCBOREncoder.Value)] = []
   ) throws -> CompleteRegistrationRequest {
     let clientDataJSON = try makeClientDataJSON(
-      type: "webauthn.create",
+      type: ceremonyType,
       challenge: options.publicKey.challenge,
       origin: origin
     )
     let authData = registrationAuthenticatorData(
       rpID: rpID,
+      includeUserPresence: includeUserPresence,
       includeUserVerification: includeUserVerification,
+      backupEligible: backupEligible,
+      embeddedCredentialID: embeddedCredentialID,
       publicKeyX963: publicKeyX963
     )
     let attestationObject = TestCBOREncoder.map([
-      (.text("fmt"), .text("none")),
+      (.text("fmt"), .text(attestationFormat)),
       (.text("authData"), .bytes(authData)),
-      (.text("attStmt"), .map([])),
+      (.text("attStmt"), .map(attestationStatement)),
     ])
     let credentialID = Base64URL.encode(credentialID)
     return CompleteRegistrationRequest(
@@ -57,17 +66,22 @@ struct TestAuthenticator {
     signCount: UInt32,
     origin: String = "https://passkeys.example.com",
     rpID: String = "passkeys.example.com",
+    ceremonyType: String = "webauthn.get",
+    includeUserPresence: Bool = true,
     includeUserVerification: Bool = true,
+    backupEligible: Bool = false,
     signingKey: P256.Signing.PrivateKey? = nil
   ) throws -> CompleteAuthenticationRequest {
     let clientDataJSON = try makeClientDataJSON(
-      type: "webauthn.get",
+      type: ceremonyType,
       challenge: options.publicKey.challenge,
       origin: origin
     )
     let authData = assertionAuthenticatorData(
       rpID: rpID,
       signCount: signCount,
+      includeUserPresence: includeUserPresence,
+      backupEligible: backupEligible,
       includeUserVerification: includeUserVerification
     )
     let clientDataHash = Data(SHA256.hash(data: clientDataJSON))
@@ -91,14 +105,21 @@ struct TestAuthenticator {
 
   private func registrationAuthenticatorData(
     rpID: String,
+    includeUserPresence: Bool,
     includeUserVerification: Bool,
+    backupEligible: Bool,
+    embeddedCredentialID: Data?,
     publicKeyX963: Data?
   ) -> Data {
-    var flags =
-      AuthenticatorFlags.userPresent.rawValue
-      | AuthenticatorFlags.attestedCredentialData.rawValue
+    var flags = AuthenticatorFlags.attestedCredentialData.rawValue
+    if includeUserPresence {
+      flags |= AuthenticatorFlags.userPresent.rawValue
+    }
     if includeUserVerification {
       flags |= AuthenticatorFlags.userVerified.rawValue
+    }
+    if backupEligible {
+      flags |= AuthenticatorFlags.backupEligible.rawValue
     }
 
     let publicKey = publicKeyX963 ?? privateKey.publicKey.x963Representation
@@ -111,22 +132,31 @@ struct TestAuthenticator {
       (.negative(-2), .bytes(x)),
       (.negative(-3), .bytes(y)),
     ])
+    let embeddedCredentialID = embeddedCredentialID ?? credentialID
     return Data(SHA256.hash(data: Data(rpID.utf8)))
       + Data([flags, 0, 0, 0, 0])
       + Data(repeating: 0, count: 16)
-      + UInt16(credentialID.count).networkBytes
-      + credentialID
+      + UInt16(embeddedCredentialID.count).networkBytes
+      + embeddedCredentialID
       + coseKey
   }
 
   private func assertionAuthenticatorData(
     rpID: String,
     signCount: UInt32,
+    includeUserPresence: Bool,
+    backupEligible: Bool,
     includeUserVerification: Bool
   ) -> Data {
-    var flags = AuthenticatorFlags.userPresent.rawValue
+    var flags: UInt8 = 0
+    if includeUserPresence {
+      flags |= AuthenticatorFlags.userPresent.rawValue
+    }
     if includeUserVerification {
       flags |= AuthenticatorFlags.userVerified.rawValue
+    }
+    if backupEligible {
+      flags |= AuthenticatorFlags.backupEligible.rawValue
     }
     return Data(SHA256.hash(data: Data(rpID.utf8)))
       + Data([flags])
@@ -167,7 +197,7 @@ extension UInt32 {
   }
 }
 
-private enum TestCBOREncoder {
+enum TestCBOREncoder {
   enum Value {
     case unsigned(UInt64)
     case negative(Int64)

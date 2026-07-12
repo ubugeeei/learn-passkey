@@ -35,6 +35,9 @@ After completing the course, you should be able to:
 5. Follow the hands-on chapters in numeric order.
 6. Use the [production hardening checklist](docs/09-production-hardening.md) before treating any derivative as production-ready.
 
+To audit what is explained, implemented, tested, or intentionally absent, use
+the [coverage and traceability audit](docs/11-coverage-audit.md).
+
 ```sh
 nix develop
 just test

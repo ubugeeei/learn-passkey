@@ -118,6 +118,21 @@ import Testing
     #expect(await repository.credential(id: credential.id) == nil)
   }
 
+  @Test(
+    "Registration rejects empty and oversized account labels",
+    arguments: InvalidAccountLabel.examples
+  )
+  func rejectsInvalidAccountLabels(example: InvalidAccountLabel) async throws {
+    let service = try makeService()
+
+    await #expect(throws: example.expectedError) {
+      try await service.beginRegistration(
+        username: example.username,
+        displayName: example.displayName
+      )
+    }
+  }
+
   private func makeService(
     repository: InMemoryPasskeyRepository = InMemoryPasskeyRepository(),
     ceremonies: InMemoryCeremonyStore = InMemoryCeremonyStore()
@@ -138,4 +153,40 @@ import Testing
       randomBytes: bytes
     )
   }
+}
+
+struct InvalidAccountLabel: CustomTestStringConvertible, Sendable {
+  let name: String
+  let username: String
+  let displayName: String
+  let expectedError: PasskeyServiceError
+
+  var testDescription: String { name }
+
+  static let examples = [
+    InvalidAccountLabel(
+      name: "blank username",
+      username: " \n ",
+      displayName: "Alice",
+      expectedError: .invalidUsername
+    ),
+    InvalidAccountLabel(
+      name: "username over 128 UTF-8 bytes",
+      username: String(repeating: "a", count: 129),
+      displayName: "Alice",
+      expectedError: .invalidUsername
+    ),
+    InvalidAccountLabel(
+      name: "blank display name",
+      username: "alice@example.com",
+      displayName: "\t",
+      expectedError: .invalidDisplayName
+    ),
+    InvalidAccountLabel(
+      name: "display name over 128 UTF-8 bytes",
+      username: "alice@example.com",
+      displayName: String(repeating: "é", count: 65),
+      expectedError: .invalidDisplayName
+    ),
+  ]
 }

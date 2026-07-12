@@ -4,7 +4,9 @@
 
 Success-path tests prove that one valid transcript works. Authentication confidence comes from showing that each altered binding fails for the right reason and that failure does not leave reusable state.
 
-The current suite has 54 tests in 11 suites:
+The suite uses named, parameterized cases where several inputs enforce the same
+invariant. Because parameterized cases are expanded by the test runner, avoid a
+manually maintained test count; the CI result is the source of truth:
 
 ```sh
 just test
@@ -57,9 +59,11 @@ No one layer substitutes for the others.
 
 Avoid a fixture that builds arbitrary “already verified” objects; it bypasses the bytes you need to test.
 
-## Recommended additional tests
+## Coverage status and additional work
 
-Implement these as exercises:
+The implemented rejection matrix is mapped to code and test suites in
+[Coverage and Traceability Audit](11-coverage-audit.md). The following remain
+additional production work rather than silently implied coverage:
 
 ### Parser cases
 
@@ -72,21 +76,14 @@ Implement these as exercises:
 - invalid UTF-8 CBOR text;
 - very large declared string before allocation.
 
-### Registration cases
+### Registration cases not yet covered by the lab
 
-- `type = webauthn.get` in a registration response;
-- `fmt = none` with a nonempty statement;
-- missing UP;
-- top-level credential ID differs from embedded ID;
 - duplicate credential ID across accounts;
 - simultaneous same-username completion race.
 
-### Authentication cases
+### Authentication cases not yet covered by the lab
 
-- missing user handle in discoverable flow;
-- handle from another account;
 - AT unexpectedly present;
-- BE changes after registration;
 - valid signature over a wrong challenge;
 - malformed but parseable DER edge cases;
 - stored counter nonzero, received zero;
